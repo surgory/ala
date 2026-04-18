@@ -1,4 +1,66 @@
---// ====================== FAZE.CC - FINAL WORKING SCRIPT ======================
+--// ====================== ADONIS BYPASS ======================
+local getinfo = getinfo or debug.getinfo
+local DEBUG = false
+local Hooked = {}
+
+local Detected, Kill
+
+setthreadidentity(2)
+
+for i, v in getgc(true) do
+    if typeof(v) == "table" then
+        local DetectFunc = rawget(v, "Detected")
+        local KillFunc = rawget(v, "Kill")
+    
+        if typeof(DetectFunc) == "function" and not Detected then
+            Detected = DetectFunc
+            
+            local Old; Old = hookfunction(Detected, function(Action, Info, NoCrash)
+                if Action ~= "_" then
+                    if DEBUG then
+                        warn(`Adonis AntiCheat flagged\nMethod: {Action}\nInfo: {Info}`)
+                    end
+                end
+                
+                return true
+            end)
+
+            table.insert(Hooked, Detected)
+        end
+
+        if rawget(v, "Variables") and rawget(v, "Process") and typeof(KillFunc) == "function" and not Kill then
+            Kill = KillFunc
+            local Old; Old = hookfunction(Kill, function(Info)
+                if DEBUG then
+                    warn(`Adonis AntiCheat tried to kill (fallback): {Info}`)
+                end
+            end)
+
+            table.insert(Hooked, Kill)
+        end
+    end
+end
+
+local Old; Old = hookfunction(getrenv().debug.info, newcclosure(function(...)
+    local LevelOrFunc, Info = ...
+
+    if Detected and LevelOrFunc == Detected then
+        if DEBUG then
+            warn(`Adonis AntiCheat sanity check detected and broken`)
+        end
+
+        return coroutine.yield(coroutine.running())
+    end
+    
+    return Old(...)
+end))
+
+setthreadidentity(7)
+
+print("✅ Adonis Bypass Loaded!")
+
+--// ====================== FAZE.CC - FINAL SCRIPT ======================
+--// SERVICES
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -121,7 +183,7 @@ StatusText.Position = UDim2.new(0, 0, 0.65, -60)
 StatusText.BackgroundTransparency = 1
 StatusText.Text = ""
 StatusText.TextSize = 12
-StatusText.Font = Enum.Font.GothamBold
+StatusText.Font = Enum.Font.Arcade
 StatusText.TextStrokeTransparency = 0.7
 StatusText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 StatusText.RichText = true
@@ -247,7 +309,7 @@ local function CreateESP(player)
     label.Text = player.Name
     label.TextColor3 = (player == TargetedPlayer) and Settings.ESPTargetColor or Settings.ESPNormalColor
     label.TextSize = Settings.ESPTextSize
-    label.Font = Enum.Font.GothamBold
+    label.Font = Enum.Font.Arcade
     label.TextStrokeTransparency = 0.5
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     label.Parent = billboard
@@ -302,7 +364,6 @@ local oldIndex = mt.__index
 local oldNamecall = mt.__namecall
 setreadonly(mt, false)
 
--- Silent Aim (The Core Feature)
 mt.__index = function(self, key)
     if key == "Hit" and Settings.SilentAim and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local closest = GetClosestPlayerToCursor()
@@ -316,7 +377,6 @@ mt.__index = function(self, key)
     return oldIndex(self, key)
 end
 
--- Bullet Mod (Remote Hook)
 mt.__namecall = newcclosure(function(self, ...)
     local args = {...}
     local method = getnamecallmethod()
@@ -419,7 +479,7 @@ local function ShowNotification(text, color)
     notif.Text = text
     notif.TextColor3 = color or Color3.fromRGB(255, 255, 255)
     notif.TextSize = 13
-    notif.Font = Enum.Font.GothamBold
+    notif.Font = Enum.Font.Arcade
     notif.TextStrokeTransparency = 0.7
     notif.TextTransparency = 1
     notif.Parent = game:GetService("CoreGui")
@@ -534,7 +594,7 @@ UpdateESP()
 ShowNotification("FAZE.CC Loaded!", Color3.fromRGB(255, 50, 50))
 
 print("========================================")
-print("FAZE.CC - FINAL WORKING SCRIPT LOADED")
+print("FAZE.CC - LOADED")
 print("INSERT - Silent Aim | E - Triggerbot")
 print("C - Camlock | V - ESP Names")
 print("K - Rapid Fire | B - Bullet Mod")
