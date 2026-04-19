@@ -44,6 +44,7 @@ local function IsAlive(Player)
 end
 
 local function GetClosestPlayer()
+    if not shared.phase['Silent Aim'].Enabled and not shared.phase['Trigger Bot'].Enabled and not shared.phase['Camera Lock'].Enabled then return nil end
     local Closest, Best = nil, shared.phase['Silent Aim'].FOV.Radius
     local MousePos = UserInputService:GetMouseLocation()
     for _, Player in pairs(Players:GetPlayers()) do
@@ -63,9 +64,10 @@ end
 
 local Target = nil
 
-local HUD = {Enabled = true, UIObjects = {}, ActiveFeatures = {}}
+local HUD = {Enabled = shared.phase.Miscelaneous['Key Display'].Enabled, UIObjects = {}}
 
 function HUD:Create()
+    if not self.Enabled then return end
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "phase_hud"
     ScreenGui.Parent = CoreGui
@@ -111,9 +113,11 @@ function HUD:Create()
     Instance.new("UIStroke", TargetLabel).Thickness = 0.8
 
     self.UIObjects = {FeaturesLabel = FeaturesLabel, TargetLabel = TargetLabel}
+    self:UpdateFeatures()
 end
 
 function HUD:UpdateFeatures()
+    if not self.Enabled or not self.UIObjects.FeaturesLabel then return end
     local Active = {}
     if shared.phase['Silent Aim'].Enabled then table.insert(Active, "Silent") end
     if shared.phase['Trigger Bot'].Enabled then table.insert(Active, "Trigger") end
@@ -129,6 +133,7 @@ function HUD:UpdateFeatures()
 end
 
 function HUD:SetTarget(Name, Active)
+    if not self.Enabled or not self.UIObjects.TargetLabel then return end
     if Name and Active then
         self.UIObjects.TargetLabel.Text = Name
         self.UIObjects.TargetLabel.TextColor3 = shared.phase.Miscelaneous['Key Display']['Key Color']
@@ -142,15 +147,15 @@ end
 
 function HUD:Start()
     self:Create()
-    self:UpdateFeatures()
     MasterUnload:RegisterModule(self)
 end
 
 function HUD:Unload() self.Enabled = false end
 
-local ESP = {Enabled = true, ESPCache = {}, Connections = {}}
+local ESP = {Enabled = shared.phase.ESP.Enabled, ESPCache = {}, Connections = {}}
 
 function ESP:CreateESP(Player)
+    if not self.Enabled then return end
     local HRP = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
     if not HRP then return end
     if self.ESPCache[Player] then pcall(function() self.ESPCache[Player]:Destroy() end) end
@@ -191,7 +196,7 @@ function ESP:CreateESP(Player)
 end
 
 function ESP:Refresh()
-    if not shared.phase.ESP.Enabled then return end
+    if not self.Enabled then return end
     for Player, Billboard in pairs(self.ESPCache) do
         if not Player or not Player.Parent or not IsAlive(Player) then
             pcall(function() Billboard:Destroy() end)
@@ -215,6 +220,7 @@ function ESP:Refresh()
 end
 
 function ESP:Start()
+    if not self.Enabled then return end
     for _, Player in pairs(Players:GetPlayers()) do
         if Player ~= LocalPlayer then
             Player.CharacterAdded:Connect(function(Char)
@@ -240,13 +246,14 @@ function ESP:Start()
 end
 
 function ESP:Unload()
-    shared.phase.ESP.Enabled = false
+    self.Enabled = false
     for _, Billboard in pairs(self.ESPCache) do pcall(function() Billboard:Destroy() end) end
     self.ESPCache = {}
 end
 
-local SilentAim = {Enabled = true}
+local SilentAim = {Enabled = shared.phase['Silent Aim'].Enabled}
 function SilentAim:Setup()
+    if not self.Enabled then return end
     local MT = getrawmetatable(Mouse)
     local Old = MT.__index
     setreadonly(MT, false)
@@ -261,9 +268,9 @@ function SilentAim:Setup()
 end
 function SilentAim:Start() self:Setup() end
 
-local TriggerBot = {Enabled = false, LastFire = 0}
+local TriggerBot = {Enabled = shared.phase['Trigger Bot'].Enabled, LastFire = 0}
 function TriggerBot:Update()
-    if not shared.phase['Trigger Bot'].Enabled then return end
+    if not self.Enabled then return end
     if not Target or not IsAlive(Target) then return end
     local Now = tick()
     if Now - self.LastFire < shared.phase['Trigger Bot'].Delay then return end
@@ -271,13 +278,14 @@ function TriggerBot:Update()
     if Tool then Tool:Activate(); self.LastFire = Now end
 end
 function TriggerBot:Start()
+    if not self.Enabled then return end
     local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
     MasterUnload:RegisterConnection(Conn)
 end
 
-local Speed = {Enabled = false}
+local Speed = {Enabled = shared.phase['Local Player'].Speed.Enabled}
 function Speed:Update()
-    if not shared.phase['Local Player'].Speed.Enabled then return end
+    if not self.Enabled then return end
     local Char = LocalPlayer.Character
     if Char then
         local Hum = Char:FindFirstChildOfClass("Humanoid")
@@ -285,18 +293,19 @@ function Speed:Update()
     end
 end
 function Speed:Start()
+    if not self.Enabled then return end
     local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
     MasterUnload:RegisterConnection(Conn)
 end
 function Speed:Unload()
-    shared.phase['Local Player'].Speed.Enabled = false
+    self.Enabled = false
     local Char = LocalPlayer.Character
     if Char then local Hum = Char:FindFirstChildOfClass("Humanoid"); if Hum then Hum.WalkSpeed = 16 end end
 end
 
-local CamLock = {Enabled = false}
+local CamLock = {Enabled = shared.phase['Camera Lock'].Enabled}
 function CamLock:Update()
-    if not shared.phase['Camera Lock'].Enabled then return end
+    if not self.Enabled then return end
     if not Target or not IsAlive(Target) then return end
     local Head = Target.Character:FindFirstChild("Head")
     if not Head then return end
@@ -307,13 +316,14 @@ function CamLock:Update()
     Camera.CFrame = Camera.CFrame:Lerp(TargetCF, shared.phase['Camera Lock'].Smoothing)
 end
 function CamLock:Start()
+    if not self.Enabled then return end
     local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
     MasterUnload:RegisterConnection(Conn)
 end
 
-local Jump = {Enabled = false}
+local Jump = {Enabled = shared.phase['Local Player'].Jump.Enabled}
 function Jump:Update()
-    if not shared.phase['Local Player'].Jump.Enabled then return end
+    if not self.Enabled then return end
     local Char = LocalPlayer.Character
     if Char then
         local Hum = Char:FindFirstChildOfClass("Humanoid")
@@ -321,16 +331,17 @@ function Jump:Update()
     end
 end
 function Jump:Start()
+    if not self.Enabled then return end
     local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
     MasterUnload:RegisterConnection(Conn)
 end
 function Jump:Unload()
-    shared.phase['Local Player'].Jump.Enabled = false
+    self.Enabled = false
     local Char = LocalPlayer.Character
     if Char then local Hum = Char:FindFirstChildOfClass("Humanoid"); if Hum then Hum.JumpPower = 50 end end
 end
 
-local WallJump = {Enabled = false, HasWallJumped = false}
+local WallJump = {Enabled = shared.phase['Local Player'].WallJump.Enabled, HasWallJumped = false}
 function WallJump:IsTouchingWall()
     local Char = LocalPlayer.Character
     if not Char then return false end
@@ -344,7 +355,7 @@ function WallJump:IsTouchingWall()
     return false
 end
 function WallJump:Perform()
-    if not shared.phase['Local Player'].WallJump.Enabled then return end
+    if not self.Enabled then return end
     local Char = LocalPlayer.Character
     if not Char then return end
     local Hum = Char:FindFirstChildOfClass("Humanoid")
@@ -360,6 +371,7 @@ function WallJump:Perform()
     end
 end
 function WallJump:Start()
+    if not self.Enabled then return end
     local Conn = LocalPlayer.CharacterAdded:Connect(function(Char)
         self.HasWallJumped = false
         local Hum = Char:WaitForChild("Humanoid")
@@ -372,9 +384,9 @@ function WallJump:Start()
     end
 end
 
-local AntiFling = {Enabled = false}
+local AntiFling = {Enabled = shared.phase['Local Player'].AntiFling.Enabled}
 function AntiFling:Update()
-    if not shared.phase['Local Player'].AntiFling.Enabled then return end
+    if not self.Enabled then return end
     local Char = LocalPlayer.Character
     if not Char then return end
     local HRP = Char:FindFirstChild("HumanoidRootPart")
@@ -383,13 +395,14 @@ function AntiFling:Update()
     if Vel.Y > 50 or Vel.Y < -50 then HRP.Velocity = Vector3.new(Vel.X, 0, Vel.Z) end
 end
 function AntiFling:Start()
+    if not self.Enabled then return end
     local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
     MasterUnload:RegisterConnection(Conn)
 end
 
-local HitboxExpander = {Enabled = false, OriginalSizes = {}}
+local HitboxExpander = {Enabled = shared.phase['Hitbox Expander'].Enabled, OriginalSizes = {}}
 function HitboxExpander:Update()
-    if not shared.phase['Hitbox Expander'].Enabled then return end
+    if not self.Enabled then return end
     for _, Player in pairs(Players:GetPlayers()) do
         if Player ~= LocalPlayer and IsAlive(Player) then
             local HRP = Player.Character:FindFirstChild("HumanoidRootPart")
@@ -405,11 +418,12 @@ function HitboxExpander:Update()
     end
 end
 function HitboxExpander:Start()
+    if not self.Enabled then return end
     local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
     MasterUnload:RegisterConnection(Conn)
 end
 function HitboxExpander:Unload()
-    shared.phase['Hitbox Expander'].Enabled = false
+    self.Enabled = false
     for Player, Size in pairs(self.OriginalSizes) do
         if Player and Player.Character then
             local HRP = Player.Character:FindFirstChild("HumanoidRootPart")
@@ -419,8 +433,9 @@ function HitboxExpander:Unload()
     self.OriginalSizes = {}
 end
 
-local PanicGround = {Enabled = true}
+local PanicGround = {Enabled = shared.phase['Local Player'].PanicGround.Enabled}
 function PanicGround:Activate()
+    if not self.Enabled then return end
     local Char = LocalPlayer.Character
     if not Char then return end
     local HRP = Char:FindFirstChild("HumanoidRootPart")
@@ -432,7 +447,7 @@ function PanicGround:Activate()
     if RayResult then HRP.CFrame = CFrame.new(RayResult.Position + Vector3.new(0, 3, 0)) end
 end
 
-local InstantFire = {Enabled = false, Connections = {}, OriginalValues = {}, IsHolding = false, HasFired = false}
+local InstantFire = {Enabled = shared.phase['Gun Modifications']['Instant Fire'].Enabled, Connections = {}, OriginalValues = {}, IsHolding = false, HasFired = false}
 function InstantFire:PatchTool(Tool)
     if not Tool or not Tool:IsA("Tool") then return end
     if self.OriginalValues[Tool] then return end
@@ -452,7 +467,7 @@ function InstantFire:FireBurst(Tool)
     for i = 1, shared.phase['Gun Modifications']['Instant Fire'].BurstCount do Tool:Activate() end
 end
 function InstantFire:Update()
-    if not shared.phase['Gun Modifications']['Instant Fire'].Enabled then return end
+    if not self.Enabled then return end
     local Char = LocalPlayer.Character
     if Char then
         local Tool = Char:FindFirstChildOfClass("Tool")
@@ -463,17 +478,19 @@ function InstantFire:Update()
     end
 end
 function InstantFire:Start()
+    if not self.Enabled then return end
     local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
     table.insert(self.Connections, Conn)
     MasterUnload:RegisterConnection(Conn)
 end
 function InstantFire:Unload()
-    shared.phase['Gun Modifications']['Instant Fire'].Enabled = false
+    self.Enabled = false
     self:UnpatchTools()
 end
 
-local ForceHit = {Enabled = false}
+local ForceHit = {Enabled = shared.phase['Gun Modifications']['Force Hit'].Enabled}
 function ForceHit:Setup()
+    if not self.Enabled then return end
     local MT = getrawmetatable(Mouse)
     local Old = MT.__index
     setreadonly(MT, false)
@@ -488,7 +505,7 @@ function ForceHit:Setup()
 end
 function ForceHit:Start() self:Setup() end
 
-local InfRange = {Enabled = true, OriginalValues = {}}
+local InfRange = {Enabled = shared.phase['Infinite Range'].Enabled, OriginalValues = {}}
 function InfRange:ModifyWeapon(Tool)
     if not Tool or not Tool:IsA("Tool") then return end
     if not self.OriginalValues[Tool] then self.OriginalValues[Tool] = {} end
@@ -499,11 +516,12 @@ function InfRange:ModifyWeapon(Tool)
     end
 end
 function InfRange:Update()
-    if not shared.phase['Infinite Range'].Enabled then return end
+    if not self.Enabled then return end
     local Char = LocalPlayer.Character
     if Char then local Tool = Char:FindFirstChildOfClass("Tool"); if Tool then self:ModifyWeapon(Tool) end end
 end
 function InfRange:Start()
+    if not self.Enabled then return end
     local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
     MasterUnload:RegisterConnection(Conn)
 end
@@ -544,45 +562,53 @@ UserInputService.InputBegan:Connect(function(Input, GameProcessed)
 
     if Input.KeyCode == Enum.KeyCode[Keybinds['Trigger Bot']] then
         shared.phase['Trigger Bot'].Enabled = not shared.phase['Trigger Bot'].Enabled
+        TriggerBot.Enabled = shared.phase['Trigger Bot'].Enabled
         HUD:UpdateFeatures()
     end
 
     if Input.KeyCode == Enum.KeyCode[Keybinds.Speed] then
         shared.phase['Local Player'].Speed.Enabled = not shared.phase['Local Player'].Speed.Enabled
+        Speed.Enabled = shared.phase['Local Player'].Speed.Enabled
         HUD:UpdateFeatures()
-        if not shared.phase['Local Player'].Speed.Enabled then Speed:Unload() end
+        if not Speed.Enabled then Speed:Unload() end
     end
 
     if Input.KeyCode == Enum.KeyCode[Keybinds['Cam Lock']] then
         shared.phase['Camera Lock'].Enabled = not shared.phase['Camera Lock'].Enabled
+        CamLock.Enabled = shared.phase['Camera Lock'].Enabled
         HUD:UpdateFeatures()
     end
 
     if Input.KeyCode == Enum.KeyCode[Keybinds.Jump] then
         shared.phase['Local Player'].Jump.Enabled = not shared.phase['Local Player'].Jump.Enabled
-        if not shared.phase['Local Player'].Jump.Enabled then Jump:Unload() end
+        Jump.Enabled = shared.phase['Local Player'].Jump.Enabled
+        if not Jump.Enabled then Jump:Unload() end
     end
 
     if Input.KeyCode == Enum.KeyCode[Keybinds['Wall Jump']] then
         shared.phase['Local Player'].WallJump.Enabled = not shared.phase['Local Player'].WallJump.Enabled
+        WallJump.Enabled = shared.phase['Local Player'].WallJump.Enabled
     end
 
     if Input.KeyCode == Enum.KeyCode[Keybinds['Force Hit']] then
         shared.phase['Gun Modifications']['Force Hit'].Enabled = not shared.phase['Gun Modifications']['Force Hit'].Enabled
+        ForceHit.Enabled = shared.phase['Gun Modifications']['Force Hit'].Enabled
     end
 
     if Input.KeyCode == Enum.KeyCode[Keybinds['Hitbox Expander']] then
         shared.phase['Hitbox Expander'].Enabled = not shared.phase['Hitbox Expander'].Enabled
+        HitboxExpander.Enabled = shared.phase['Hitbox Expander'].Enabled
         HUD:UpdateFeatures()
-        if not shared.phase['Hitbox Expander'].Enabled then HitboxExpander:Unload() end
+        if not HitboxExpander.Enabled then HitboxExpander:Unload() end
     end
 
     if Input.KeyCode == Enum.KeyCode[Keybinds['Panic Ground']] then PanicGround:Activate() end
 
     if Input.KeyCode == Enum.KeyCode[Keybinds['Instant Fire']] then
         shared.phase['Gun Modifications']['Instant Fire'].Enabled = not shared.phase['Gun Modifications']['Instant Fire'].Enabled
+        InstantFire.Enabled = shared.phase['Gun Modifications']['Instant Fire'].Enabled
         HUD:UpdateFeatures()
-        if not shared.phase['Gun Modifications']['Instant Fire'].Enabled then InstantFire:Unload() end
+        if not InstantFire.Enabled then InstantFire:Unload() end
     end
 
     if Input.KeyCode == Enum.KeyCode.Space then WallJump:Perform() end
@@ -597,5 +623,3 @@ end)
 UserInputService.InputEnded:Connect(function(Input)
     if Input.UserInputType == Enum.UserInputType.MouseButton1 then InstantFire.IsHolding = false end
 end)
-
-HUD:UpdateFeatures()
