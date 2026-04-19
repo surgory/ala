@@ -1,144 +1,191 @@
---// ====================== faze.cc - COMPLETE SCRIPT ======================
-local cfg = shared.faze
-
--- Services
 local players = game:GetService("Players")
 local uis = game:GetService("UserInputService")
-local runservice = game:GetService("RunService")
-local workspace = game:GetService("Workspace")
+local run = game:GetService("RunService")
 local camera = workspace.CurrentCamera
 local localplayer = players.LocalPlayer
 local mouse = localplayer:GetMouse()
-local replicated = game:GetService("ReplicatedStorage")
+local workspace = game:GetService("Workspace")
+local replicatedstorage = game:GetService("ReplicatedStorage")
 
--- Variables
+local Config = shared.faze
+
 local targeted_player = nil
-local silent_aim_active = false
-local triggerbot_active = false
-local camlock_active = false
-local speed_active = false
-local esp_active = true
-local rapid_active = false
-local firing = false
-local last_shot = 0
-local last_rapid = 0
 local esp_cache = {}
-local main_remote = replicated:FindFirstChild("Remotes") and replicated.Remotes:FindFirstChild("MainRemoteEvent")
+local trigger_enabled = false
+local aim_assist_active = false
+local speed_enabled = false
+local superjump_enabled = false
+local isfiring = false
+local lastrapidfire = 0
+local last_trigger = 0
+local haswalljumped = false
+local walljumpconnection = nil
 
--- Status GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "faze_cc"
-gui.Parent = game:GetService("CoreGui")
+local fov_circle = Instance.new("Frame")
+fov_circle.Size = UDim2.new(0, Config.TriggerBot.Settings.FOV.Radius * 2, 0, Config.TriggerBot.Settings.FOV.Radius * 2)
+fov_circle.BackgroundTransparency = 0.9
+fov_circle.BorderSizePixel = 1
+fov_circle.BorderColor3 = Color3.fromRGB(255, 50, 50)
+fov_circle.Visible = false
+fov_circle.Parent = game:GetService("CoreGui")
+Instance.new("UICorner", fov_circle).CornerRadius = UDim.new(1, 0)
 
-local status = Instance.new("TextLabel")
-status.Size = UDim2.new(0, 200, 0, 120)
-status.Position = UDim2.new(0, 10, 0, 10)
-status.BackgroundTransparency = 1
-status.Text = "faze.cc\nSilent: ON\nTrigger: OFF\nCamlock: OFF\nSpeed: OFF\nESP: ON\nTarget: NONE"
-status.TextColor3 = Color3.fromRGB(180, 50, 255)
-status.TextSize = 12
-status.Font = Enum.Font.FredokaOne
-status.TextStrokeTransparency = 0.7
-status.TextXAlignment = Enum.TextXAlignment.Left
-status.RichText = true
-status.Parent = gui
+local key_display = Instance.new("ScreenGui")
+key_display.Name = "faze_hud"
+key_display.Parent = game:GetService("CoreGui")
 
--- Update status display
-local function update_status()
-    local silent_status = cfg['Silent Aim']['Enabled'] and "<font color='#50FF50'>ON</font>" or "<font color='#FF5050'>OFF</font>"
-    local trigger_status = cfg['Trigger Bot']['Enabled'] and "<font color='#50FF50'>ON</font>" or "<font color='#FF5050'>OFF</font>"
-    local camlock_status = cfg['Camlock']['Enabled'] and "<font color='#50FF50'>ON</font>" or "<font color='#FF5050'>OFF</font>"
-    local speed_status = cfg['Local Player']['Speed']['Enabled'] and "<font color='#50FF50'>ON</font>" or "<font color='#FF5050'>OFF</font>"
-    local esp_status = cfg['ESP']['Enabled'] and "<font color='#50FF50'>ON</font>" or "<font color='#FF5050'>OFF</font>"
-    local target_status = targeted_player and targeted_player.Name or "NONE"
-    
-    status.Text = string.format("faze.cc\nSilent: %s\nTrigger: %s\nCamlock: %s\nSpeed: %s\nESP: %s\nTarget: %s",
-        silent_status, trigger_status, camlock_status, speed_status, esp_status, target_status)
+local text_label = Instance.new("TextLabel")
+text_label.Size = UDim2.new(1, 0, 0, 24)
+text_label.Position = UDim2.new(0.5, 0, 0.5, 366)
+text_label.AnchorPoint = Vector2.new(0.5, 0.5)
+text_label.BackgroundTransparency = 1
+text_label.Text = Config.Miscelaneous.KeyDisplay.Title
+text_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Faze Title']
+text_label.TextSize = 18.2
+text_label.Font = Enum.Font.GothamBold
+text_label.ZIndex = 10
+text_label.Parent = key_display
+
+local text_stroke = Instance.new("UIStroke")
+text_stroke.Thickness = 0.8
+text_stroke.Color = Color3.fromRGB(0, 0, 0)
+text_stroke.Parent = text_label
+
+local text_shadow = Instance.new("TextLabel")
+text_shadow.Size = UDim2.new(1, 0, 0, 24)
+text_shadow.Position = UDim2.new(0.5, 2, 0.5, 368)
+text_shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+text_shadow.BackgroundTransparency = 1
+text_shadow.Text = Config.Miscelaneous.KeyDisplay.Title
+text_shadow.TextColor3 = Color3.fromRGB(0, 0, 0)
+text_shadow.TextTransparency = 0.5
+text_shadow.TextSize = 18.2
+text_shadow.Font = Enum.Font.GothamBold
+text_shadow.ZIndex = 9
+text_shadow.Parent = key_display
+
+local features_label = Instance.new("TextLabel")
+features_label.Size = UDim2.new(1, 0, 0, 40)
+features_label.Position = UDim2.new(0.5, 0, 0.5, 381)
+features_label.AnchorPoint = Vector2.new(0.5, 0.5)
+features_label.BackgroundTransparency = 1
+features_label.Text = "Silent | Trigger | ESP"
+features_label.TextColor3 = Color3.fromRGB(255, 255, 255)
+features_label.TextSize = 12.3
+features_label.Font = Enum.Font.GothamBold
+features_label.ZIndex = 10
+features_label.Parent = key_display
+
+local features_stroke = Instance.new("UIStroke")
+features_stroke.Thickness = 0.8
+features_stroke.Color = Color3.fromRGB(0, 0, 0)
+features_stroke.Parent = features_label
+
+local features_shadow = Instance.new("TextLabel")
+features_shadow.Size = UDim2.new(1, 0, 0, 40)
+features_shadow.Position = UDim2.new(0.5, 2, 0.5, 383)
+features_shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+features_shadow.BackgroundTransparency = 1
+features_shadow.Text = "Silent | Trigger | ESP"
+features_shadow.TextColor3 = Color3.fromRGB(255, 255, 255)
+features_shadow.TextTransparency = 0.5
+features_shadow.TextSize = 12.3
+features_shadow.Font = Enum.Font.GothamBold
+features_shadow.ZIndex = 9
+features_shadow.Parent = key_display
+
+local target_label = Instance.new("TextLabel")
+target_label.Size = UDim2.new(1, 0, 0, 20)
+target_label.Position = UDim2.new(0.5, 0, 0.5, 394.2)
+target_label.AnchorPoint = Vector2.new(0.5, 0.5)
+target_label.BackgroundTransparency = 1
+target_label.Text = ""
+target_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
+target_label.TextSize = 13.5
+target_label.Font = Enum.Font.GothamBold
+target_label.ZIndex = 10
+target_label.Parent = key_display
+
+local target_stroke = Instance.new("UIStroke")
+target_stroke.Thickness = 0.8
+target_stroke.Color = Color3.fromRGB(0, 0, 0)
+target_stroke.Parent = target_label
+
+local target_shadow = Instance.new("TextLabel")
+target_shadow.Size = UDim2.new(1, 0, 0, 20)
+target_shadow.Position = UDim2.new(0.5, 2, 0.5, 396.2)
+target_shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+target_shadow.BackgroundTransparency = 1
+target_shadow.Text = ""
+target_shadow.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
+target_shadow.TextTransparency = 0.5
+target_shadow.TextSize = 13.5
+target_shadow.Font = Enum.Font.GothamBold
+target_shadow.ZIndex = 9
+target_shadow.Parent = key_display
+
+local function update_features_display(active)
+    if active then
+        features_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
+        features_shadow.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
+    else
+        features_label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        features_shadow.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
 end
 
--- Utility functions
+local function update_target_display(name)
+    if name then
+        target_label.Text = name
+        target_shadow.Text = name
+    else
+        target_label.Text = ""
+        target_shadow.Text = ""
+    end
+end
+
+local esp_gui = Instance.new("ScreenGui")
+esp_gui.Name = "faze_esp"
+esp_gui.Parent = game:GetService("CoreGui")
+
 local function is_alive(plr)
     if not plr or not plr.Character then return false end
     local hum = plr.Character:FindFirstChild("Humanoid")
     return hum and hum.Health > 0
 end
 
-local function check_knocked(plr)
-    if not cfg['Checks']['For Features']['Knocked'] then return false end
-    if not plr or not plr.Character then return false end
-    local be = plr.Character:FindFirstChild("BodyEffects")
-    if be then
-        local ko = be:FindFirstChild("K.O")
-        if ko and ko.Value then return true end
-        local knocked = be:FindFirstChild("Knocked")
-        if knocked and knocked.Value then return true end
-    end
-    return false
-end
-
-local function check_forcefield(plr)
-    if not cfg['Checks']['For Features']['Forcefield'] then return false end
-    return plr and plr.Character and plr.Character:FindFirstChildOfClass("ForceField") ~= nil
-end
-
-local function check_wall(target_part, target_char)
-    if not cfg['Checks']['For Features']['Wall Check'] then return true end
-    if not target_part then return false end
-    
-    local origin = camera.CFrame.Position
-    local dir = (target_part.Position - origin).Unit
-    local dist = (target_part.Position - origin).Magnitude
-    
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Blacklist
-    params.FilterDescendantsInstances = {localplayer.Character, target_char}
-    
-    local hit = workspace:Raycast(origin, dir * dist, params)
-    return hit == nil
-end
-
-local function is_valid_target(plr)
-    if not plr or plr == localplayer then return false end
+local function check_conditions(plr)
+    local checks = Config.Checks['For Features']
     if not is_alive(plr) then return false end
-    if check_knocked(plr) then return false end
-    if check_forcefield(plr) then return false end
+    if checks.Knocked then
+        local be = plr.Character:FindFirstChild("BodyEffects")
+        if be then
+            if be:FindFirstChild("K.O") and be["K.O"].Value then return false end
+            if be:FindFirstChild("Knocked") and be.Knocked.Value then return false end
+        end
+    end
+    if checks.Grabbed and plr.Character:FindFirstChild("GRABBING_CONSTRAINT") then return false end
+    if checks.Forcefield and plr.Character:FindFirstChild("ForceField") then return false end
+    if checks['Self Knocked'] then
+        local be = localplayer.Character and localplayer.Character:FindFirstChild("BodyEffects")
+        if be then
+            if be:FindFirstChild("K.O") and be["K.O"].Value then return false end
+            if be:FindFirstChild("Knocked") and be.Knocked.Value then return false end
+        end
+    end
     return true
 end
 
-local function get_target_part(character, hit_part)
-    if hit_part == "Head" then
-        return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    elseif hit_part == "Closest Part" then
-        local closest, best = nil, math.huge
-        local parts = {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"}
-        local mpos = uis:GetMouseLocation()
-        for _, name in ipairs(parts) do
-            local p = character:FindFirstChild(name)
-            if p then
-                local pos, onscreen = camera:WorldToViewportPoint(p.Position)
-                if onscreen then
-                    local dist = (Vector2.new(pos.X, pos.Y) - mpos).Magnitude
-                    if dist < best then best = dist; closest = p end
-                end
-            end
-        end
-        return closest
-    end
-    return character:FindFirstChild("HumanoidRootPart")
-end
-
--- Target selection
-local function get_closest_player_to_crosshair()
-    local mpos = uis:GetMouseLocation()
+local function get_closest_player()
     local closest, best = nil, 100
-    
+    local mouse_pos = uis:GetMouseLocation()
     for _, plr in ipairs(players:GetPlayers()) do
-        if is_valid_target(plr) then
+        if plr ~= localplayer and check_conditions(plr) then
             local part = plr.Character:FindFirstChild("Head") or plr.Character:FindFirstChild("HumanoidRootPart")
             if part then
                 local pos, onscreen = camera:WorldToViewportPoint(part.Position)
                 if onscreen then
-                    local dist = (Vector2.new(pos.X, pos.Y) - mpos).Magnitude
+                    local dist = (Vector2.new(pos.X, pos.Y) - mouse_pos).Magnitude
                     if dist < best then best = dist; closest = plr end
                 end
             end
@@ -147,272 +194,383 @@ local function get_closest_player_to_crosshair()
     return closest
 end
 
--- Silent Aim
-local mt = getrawmetatable(game)
-local old_index = mt.__index
-setreadonly(mt, false)
-
-mt.__index = function(self, key)
-    if key == "Hit" and cfg['Silent Aim']['Enabled'] then
-        if targeted_player and is_valid_target(targeted_player) then
-            local part = get_target_part(targeted_player.Character, cfg['Silent Aim']['Settings']['Hit Part'])
-            if part and check_wall(part, targeted_player.Character) then
-                return part.CFrame
-            end
-        end
+local function create_esp(plr)
+    if not plr.Character then return end
+    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if esp_cache[plr] then esp_cache[plr]:Destroy() end
+    local bill = Instance.new("BillboardGui")
+    bill.Size = UDim2.new(0, 100, 0, 40)
+    bill.StudsOffset = Vector3.new(0, -3.5, 0)
+    bill.AlwaysOnTop = true
+    bill.MaxDistance = Config.ESP.Settings['Max Distance']
+    bill.Parent = hrp
+    
+    local display = Instance.new("TextLabel")
+    display.Name = "Display"
+    display.Size = UDim2.new(1, 0, 0.33, 0)
+    display.BackgroundTransparency = 1
+    display.Text = plr.DisplayName
+    display.TextColor3 = (plr == targeted_player) and Config.ESP.Settings.Names['Target Color'] or Config.ESP.Settings.Names.Color
+    display.TextSize = 11
+    display.Font = Enum.Font.FredokaOne
+    display.TextStrokeTransparency = 0.5
+    display.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    display.Parent = bill
+    
+    local username = Instance.new("TextLabel")
+    username.Name = "Username"
+    username.Size = UDim2.new(1, 0, 0.33, 0)
+    username.Position = UDim2.new(0, 0, 0.33, -2)
+    username.BackgroundTransparency = 1
+    username.Text = "@" .. plr.Name
+    username.TextColor3 = (plr == targeted_player) and Config.ESP.Settings.Names['Target Color'] or Config.ESP.Settings.Names.Color
+    username.TextSize = 10
+    username.Font = Enum.Font.FredokaOne
+    username.TextStrokeTransparency = 0.6
+    username.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    username.TextTransparency = 0.4
+    username.Parent = bill
+    
+    if Config.ESP.Settings.Health.Enabled then
+        local health = Instance.new("TextLabel")
+        health.Name = "Health"
+        health.Size = UDim2.new(1, 0, 0.33, 0)
+        health.Position = UDim2.new(0, 0, 0.66, -2)
+        health.BackgroundTransparency = 1
+        health.Text = "HP " .. math.floor(plr.Character.Humanoid.Health)
+        health.TextColor3 = Config.ESP.Settings.Health.Color
+        health.TextSize = 10
+        health.Font = Enum.Font.FredokaOne
+        health.TextStrokeTransparency = 0.6
+        health.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        health.Parent = bill
     end
-    return old_index(self, key)
-end
-setreadonly(mt, true)
-
--- Zero Spread (Sniper DB)
-local old_random = math.random
-math.random = function(...)
-    if cfg['Gun Modifications']['Custom Spread']['Enabled'] then
-        local char = localplayer.Character
-        if char then
-            local tool = char:FindFirstChildOfClass("Tool")
-            if tool and cfg['Gun Modifications']['Custom Spread'][tool.Name] then
-                return old_random(...) * cfg['Gun Modifications']['Custom Spread'][tool.Name]
-            end
-        end
-    end
-    return old_random(...)
+    
+    esp_cache[plr] = bill
 end
 
--- Weapon firing
-local function fire_weapon()
-    local char = localplayer.Character
-    if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool and tool.Name ~= "[Knife]" then
-        pcall(function() tool:Activate() end)
-    end
-end
-
--- Triggerbot
-local function triggerbot_check()
-    if not cfg['Trigger Bot']['Enabled'] then return end
-    if not targeted_player or not is_valid_target(targeted_player) then return end
-    
-    local now = tick()
-    if now - last_shot < cfg['Trigger Bot']['Interval'] then return end
-    
-    local part = get_target_part(targeted_player.Character, "Head")
-    if not part then return end
-    
-    local pos, onscreen = camera:WorldToViewportPoint(part.Position)
-    if not onscreen then return end
-    
-    local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
-    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-    if dist > 120 then return end
-    
-    if not check_wall(part, targeted_player.Character) then return end
-    
-    fire_weapon()
-    last_shot = now
-end
-
--- Camlock
-local function camlock_update()
-    if not cfg['Camlock']['Enabled'] then return end
-    if not targeted_player or not is_valid_target(targeted_player) then return end
-    
-    local part = get_target_part(targeted_player.Character, cfg['Camlock']['Settings']['Part'])
-    if not part then return end
-    
-    local smooth = cfg['Camlock']['Settings']['Smoothing']
-    local target_cf = CFrame.new(camera.CFrame.Position, part.Position)
-    local alpha = math.min(1 / smooth.X, 1)
-    camera.CFrame = camera.CFrame:Lerp(target_cf, alpha)
-end
-
--- Speed
-local function apply_speed()
-    if not cfg['Local Player']['Speed']['Enabled'] then return end
-    local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
-    if hum then
-        hum.WalkSpeed = 16 * cfg['Local Player']['Speed']['Multipliers']['Normal']
-    end
-end
-
--- ESP
-local esp_gui = Instance.new("ScreenGui")
-esp_gui.Name = "faze_esp"
-esp_gui.Parent = game:GetService("CoreGui")
-
-local function update_esp()
-    if not cfg['ESP']['Enabled'] then
+local function refresh_esp()
+    if not Config.ESP.Enabled then
         for _, bill in pairs(esp_cache) do bill:Destroy() end
         esp_cache = {}
         return
     end
-    
+    for plr, bill in pairs(esp_cache) do
+        if not plr or not plr.Parent or not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then
+            pcall(function() bill:Destroy() end)
+            esp_cache[plr] = nil
+        end
+    end
     for _, plr in ipairs(players:GetPlayers()) do
-        if plr ~= localplayer and is_alive(plr) then
+        if plr ~= localplayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and is_alive(plr) then
             if not esp_cache[plr] then
-                local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    local bill = Instance.new("BillboardGui")
-                    bill.Size = UDim2.new(0, 100, 0, 26)
-                    bill.StudsOffset = Vector3.new(0, -3.5, 0)
-                    bill.AlwaysOnTop = true
-                    bill.MaxDistance = 500
-                    
-                    local display = Instance.new("TextLabel")
-                    display.Name = "Display"
-                    display.Size = UDim2.new(1, 0, 0.5, 0)
-                    display.BackgroundTransparency = 1
-                    display.Text = plr.DisplayName
-                    display.TextColor3 = cfg['ESP']['Settings']['Names']['Color']
-                    display.TextSize = 11
-                    display.Font = Enum.Font.FredokaOne
-                    display.TextStrokeTransparency = 0.5
-                    display.Parent = bill
-                    
-                    local username = Instance.new("TextLabel")
-                    username.Name = "Username"
-                    username.Size = UDim2.new(1, 0, 0.5, 0)
-                    username.Position = UDim2.new(0, 0, 0.5, -2)
-                    username.BackgroundTransparency = 1
-                    username.Text = "@" .. plr.Name
-                    username.TextColor3 = cfg['ESP']['Settings']['Names']['Color']
-                    username.TextSize = 10
-                    username.Font = Enum.Font.FredokaOne
-                    username.TextStrokeTransparency = 0.6
-                    username.TextTransparency = 0.3
-                    username.Parent = bill
-                    
-                    bill.Parent = hrp
-                    esp_cache[plr] = {bill = bill, display = display, username = username}
+                create_esp(plr)
+            else
+                local bill = esp_cache[plr]
+                local display = bill:FindFirstChild("Display")
+                local username = bill:FindFirstChild("Username")
+                local health = bill:FindFirstChild("Health")
+                if display then
+                    display.TextColor3 = (plr == targeted_player) and Config.ESP.Settings.Names['Target Color'] or Config.ESP.Settings.Names.Color
                 end
-            end
-            
-            -- Update colors for target
-            if esp_cache[plr] then
-                local color = (plr == targeted_player) and cfg['ESP']['Settings']['Names']['Target Color'] or cfg['ESP']['Settings']['Names']['Color']
-                esp_cache[plr].display.TextColor3 = color
-                esp_cache[plr].username.TextColor3 = color
-            end
-        else
-            if esp_cache[plr] then
-                esp_cache[plr].bill:Destroy()
-                esp_cache[plr] = nil
+                if username then
+                    username.TextColor3 = (plr == targeted_player) and Config.ESP.Settings.Names['Target Color'] or Config.ESP.Settings.Names.Color
+                end
+                if health and Config.ESP.Settings.Health.Enabled then
+                    health.Text = "HP " .. math.floor(plr.Character.Humanoid.Health)
+                end
             end
         end
     end
 end
 
--- Rapid Fire
-uis.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        firing = true
-        task.spawn(function()
-            while firing and cfg['Rapid Fire']['Enabled'] do
-                fire_weapon()
-                runservice.RenderStepped:Wait()
+local mt = getrawmetatable(mouse)
+local old_index = mt.__index
+setreadonly(mt, false)
+
+mt.__index = function(self, key)
+    if key == "Hit" then
+        if Config.SilentAim.Enabled and targeted_player and is_alive(targeted_player) then
+            local part = targeted_player.Character:FindFirstChild(Config.SilentAim.Settings['Hit Part']) or targeted_player.Character:FindFirstChild("HumanoidRootPart")
+            if part then return part.CFrame end
+        elseif Config['Force Hit'].Enabled and targeted_player and is_alive(targeted_player) then
+            local part = targeted_player.Character:FindFirstChild(Config['Force Hit'].Settings['Hit Part']) or targeted_player.Character:FindFirstChild("HumanoidRootPart")
+            if part then return part.CFrame end
+        end
+    end
+    return old_index(self, key)
+end
+
+setreadonly(mt, true)
+
+local function is_target_in_fov()
+    if not targeted_player or not is_alive(targeted_player) then return false end
+    local head = targeted_player.Character:FindFirstChild("Head") or targeted_player.Character:FindFirstChild("HumanoidRootPart")
+    if not head then return false end
+    local pos, onscreen = camera:WorldToViewportPoint(head.Position)
+    if not onscreen then return false end
+    local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+    return dist < Config.TriggerBot.Settings.FOV.Radius
+end
+
+local function fire_weapon()
+    local char = localplayer.Character
+    if not char then return end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return end
+    if tool.Name == "[Knife]" then return end
+    tool:Activate()
+end
+
+local function get_closest_aim_assist()
+    local closest, best = nil, Config.AimAssist.Settings.FOV.Radius
+    local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+    for _, plr in ipairs(players:GetPlayers()) do
+        if plr ~= localplayer and check_conditions(plr) then
+            local part = plr.Character:FindFirstChild(Config.AimAssist.Settings.Part) or plr.Character:FindFirstChild("HumanoidRootPart")
+            if part then
+                local pos, onscreen = camera:WorldToViewportPoint(part.Position)
+                if onscreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if dist < best then best = dist; closest = plr end
+                end
             end
-        end)
+        end
     end
-end)
+    return closest
+end
 
-uis.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        firing = false
+local function getrapidgun()
+    local char = localplayer.Character
+    if not char then return nil end
+    for _, tool in next, char:GetChildren() do
+        if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
+            return tool
+        end
     end
-end)
+    return nil
+end
 
--- Keybinds
-local keybinds = cfg['Miscellaneous']['Keybinds']
-uis.InputBegan:Connect(function(input, processed)
-    if processed then return end
+local function rapidfire()
+    if not Config.GunModifications.Taps.Enabled then
+        isfiring = false
+        return
+    end
+    if not isfiring then return end
+    if tick() - lastrapidfire < 0.01 then return end
+    local gun = getrapidgun()
+    if not gun then return end
+    local tap_count = Config.GunModifications.Taps[gun.Name]
+    if tap_count and tap_count > 1 then
+        for i = 1, tap_count do
+            gun:Activate()
+        end
+    else
+        gun:Activate()
+    end
+    lastrapidfire = tick()
+end
+
+local function touchingwall()
+    local char = localplayer.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {char}
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local dirs = {hrp.CFrame.LookVector, -hrp.CFrame.LookVector, hrp.CFrame.RightVector, -hrp.CFrame.RightVector}
+    for _, d in pairs(dirs) do
+        local ray = workspace:Raycast(hrp.Position, d * 2.5, params)
+        if ray then return true end
+    end
+    return false
+end
+
+local function getspidermanjumppower()
+    local char = localplayer.Character
+    if not char then return Config.LocalPlayer.Spiderman['Jump Power'] end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool and tool.Name == "[Knife]" then
+        return Config.LocalPlayer.Spiderman['Knife Jump Power']
+    end
+    return Config.LocalPlayer.Spiderman['Jump Power']
+end
+
+local function setupwalljumpreset()
+    if walljumpconnection then walljumpconnection:Disconnect() end
+    haswalljumped = false
+    local char = localplayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    walljumpconnection = hum.StateChanged:Connect(function(old, new)
+        if new == Enum.HumanoidStateType.Landed or new == Enum.HumanoidStateType.Running then
+            haswalljumped = false
+        end
+    end)
+end
+
+local function applyheadless(char)
+    if not Config.LocalPlayer.Headless.Enabled then return end
+    local head = char:FindFirstChild("Head")
+    if head then
+        head.Transparency = 1
+        local face = head:FindFirstChild("face")
+        if face then face.Transparency = 1 end
+    end
+    if Config.LocalPlayer.Headless['Remove Face Accessories'] then
+        for _, acc in ipairs(char:GetChildren()) do
+            if acc:IsA("Accessory") and acc.AccessoryType == Enum.AccessoryType.Face then
+                local handle = acc:FindFirstChild("Handle")
+                if handle then handle.Transparency = 1 end
+            end
+        end
+    end
+end
+
+run.RenderStepped:Connect(function()
+    if Config.TriggerBot.Enabled and trigger_enabled then
+        local now = tick()
+        if now - last_trigger >= Config.TriggerBot.Delay then
+            if targeted_player and is_alive(targeted_player) and is_target_in_fov() then
+                fire_weapon()
+                last_trigger = now
+            end
+        end
+        local mp = uis:GetMouseLocation()
+        fov_circle.Position = UDim2.new(0, mp.X - Config.TriggerBot.Settings.FOV.Radius, 0, mp.Y - Config.TriggerBot.Settings.FOV.Radius)
+    end
     
+    if Config.AimAssist.Enabled and aim_assist_active then
+        local target = get_closest_aim_assist()
+        if target and target.Character then
+            local part = target.Character:FindFirstChild(Config.AimAssist.Settings.Part) or target.Character:FindFirstChild("HumanoidRootPart")
+            if part then
+                local cf = CFrame.new(camera.CFrame.Position, part.Position)
+                camera.CFrame = camera.CFrame:Lerp(cf, Config.AimAssist.Settings.Sharpness)
+            end
+        end
+    end
+    
+    if Config.LocalPlayer.Speed.Enabled and speed_enabled then
+        local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
+        if hum then
+            hum.WalkSpeed = 16 * Config.LocalPlayer.Speed.Multiplier
+        end
+    end
+    
+    if Config.LocalPlayer.SuperJump.Enabled and superjump_enabled then
+        local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
+        if hum then
+            hum.JumpPower = Config.LocalPlayer.SuperJump['Jump Power']
+        end
+    end
+    
+    refresh_esp()
+    rapidfire()
+end)
+
+uis.InputBegan:Connect(function(input, gp)
+    if gp then return end
     local key = input.KeyCode
     
-    if key == Enum.KeyCode[keybinds['Selection']] then
-        targeted_player = get_closest_player_to_crosshair()
-        update_status()
-        update_esp()
+    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds.Selection] then
+        targeted_player = get_closest_player()
+        if targeted_player then
+            update_target_display(targeted_player.Name)
+            update_features_display(true)
+        end
     end
     
-    if key == Enum.KeyCode[keybinds['Silent Aim']] then
-        cfg['Silent Aim']['Enabled'] = not cfg['Silent Aim']['Enabled']
-        update_status()
-    end
-    
-    if key == Enum.KeyCode[keybinds['Trigger Bot']] then
-        cfg['Trigger Bot']['Enabled'] = not cfg['Trigger Bot']['Enabled']
-        update_status()
-    end
-    
-    if key == Enum.KeyCode[keybinds['Camlock']] then
-        cfg['Camlock']['Enabled'] = not cfg['Camlock']['Enabled']
-        update_status()
-    end
-    
-    if key == Enum.KeyCode[keybinds['Speed']] then
-        cfg['Local Player']['Speed']['Enabled'] = not cfg['Local Player']['Speed']['Enabled']
-        apply_speed()
-        update_status()
-    end
-    
-    if key == Enum.KeyCode[keybinds['ESP']] then
-        cfg['ESP']['Enabled'] = not cfg['ESP']['Enabled']
-        update_esp()
-        update_status()
-    end
-    
-    if key == Enum.KeyCode.Y then
+    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Clear Target']] then
         targeted_player = nil
-        update_status()
-        update_esp()
+        update_target_display(nil)
+        update_features_display(false)
     end
     
-    if key == Enum.KeyCode.End then
-        -- Unload
-        cfg['Silent Aim']['Enabled'] = false
-        cfg['Trigger Bot']['Enabled'] = false
-        cfg['Camlock']['Enabled'] = false
-        cfg['Local Player']['Speed']['Enabled'] = false
-        cfg['ESP']['Enabled'] = false
-        update_esp()
+    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Trigger Bot']] then
+        trigger_enabled = not trigger_enabled
+        fov_circle.Visible = trigger_enabled and Config.TriggerBot.Settings.FOV.Visible
+    end
+    
+    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Aim Assist']] then
+        aim_assist_active = not aim_assist_active
+    end
+    
+    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds.Speed] then
+        speed_enabled = not speed_enabled
+        if not speed_enabled then
+            local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
+            if hum then hum.WalkSpeed = 16 end
+        end
+    end
+    
+    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Super Jump']] then
+        superjump_enabled = not superjump_enabled
+        if not superjump_enabled then
+            local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
+            if hum then hum.JumpPower = 50 end
+        end
+    end
+    
+    if key == Enum.KeyCode.Space and Config.LocalPlayer.Spiderman.Enabled then
+        local char = localplayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hum and hrp and hum:GetState() == Enum.HumanoidStateType.Freefall and touchingwall() and not haswalljumped then
+                haswalljumped = true
+                hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, getspidermanjumppower(), hrp.AssemblyLinearVelocity.Z)
+            end
+        end
+    end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if Config.GunModifications.Taps.Enabled then
+            local gun = getrapidgun()
+            if gun then isfiring = true end
+        end
+    end
+    
+    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds.Unload] then
         setreadonly(mt, false)
         mt.__index = old_index
         setreadonly(mt, true)
-        math.random = old_random
-        gui:Destroy()
+        for _, bill in pairs(esp_cache) do bill:Destroy() end
+        fov_circle:Destroy()
         esp_gui:Destroy()
-        print("faze.cc - Unloaded")
+        key_display:Destroy()
+        if walljumpconnection then walljumpconnection:Disconnect() end
     end
 end)
 
--- Character handling
+uis.InputEnded:Connect(function(input, gp)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isfiring = false
+    end
+end)
+
+players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(char)
+        char:WaitForChild("HumanoidRootPart", 10)
+        repeat task.wait(0.1) until is_alive(plr)
+        refresh_esp()
+    end)
+end)
+
 localplayer.CharacterAdded:Connect(function(char)
-    apply_speed()
-    update_esp()
+    repeat task.wait(0.1) until is_alive(localplayer)
+    refresh_esp()
+    setupwalljumpreset()
+    applyheadless(char)
 end)
 
--- Loops
-runservice.RenderStepped:Connect(function()
-    triggerbot_check()
-    camlock_update()
-end)
+if localplayer.Character then
+    setupwalljumpreset()
+    applyheadless(localplayer.Character)
+end
 
-runservice.Heartbeat:Connect(function()
-    update_esp()
-end)
-
--- Initial
-apply_speed()
-update_esp()
-update_status()
-
-print("========================================")
-print("faze.cc - Loaded")
-print("C - Target | Y - Clear")
-print("V - Triggerbot | X - Camlock")
-print("G - Speed | B - ESP")
-print("END - Unload")
-print("========================================")
+refresh_esp()
