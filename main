@@ -1,607 +1,601 @@
--- faze.cc | Complete Fixed SRC
-local players = game:GetService("Players")
-local uis = game:GetService("UserInputService")
-local run = game:GetService("RunService")
-local camera = workspace.CurrentCamera
-local localplayer = players.LocalPlayer
-local mouse = localplayer:GetMouse()
-local workspace = game:GetService("Workspace")
-local replicatedstorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
 
-local Config = shared.faze
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
 
-local targeted_player = nil
-local esp_cache = {}
-local trigger_enabled = false
-local aim_assist_active = false
-local speed_enabled = false
-local superjump_enabled = false
-local isfiring = false
-local lastrapidfire = 0
-local last_trigger = 0
-local haswalljumped = false
-local walljumpconnection = nil
+local MasterUnload = {Modules = {}, Connections = {}, Instances = {}}
 
-local fov_circle = Instance.new("Frame")
-fov_circle.Size = UDim2.new(0, Config['Trigger Bot'].Settings.FOV.Radius * 2, 0, Config['Trigger Bot'].Settings.FOV.Radius * 2)
-fov_circle.BackgroundTransparency = 0.9
-fov_circle.BorderSizePixel = 1
-fov_circle.BorderColor3 = Color3.fromRGB(255, 50, 50)
-fov_circle.Visible = false
-fov_circle.Parent = game:GetService("CoreGui")
-Instance.new("UICorner", fov_circle).CornerRadius = UDim.new(1, 0)
+function MasterUnload:RegisterModule(Module) table.insert(self.Modules, Module) end
+function MasterUnload:RegisterConnection(Connection) table.insert(self.Connections, Connection) end
+function MasterUnload:RegisterInstance(Instance) table.insert(self.Instances, Instance) end
 
-local key_display = Instance.new("ScreenGui")
-key_display.Name = "faze_hud"
-key_display.Parent = game:GetService("CoreGui")
-
-local text_label = Instance.new("TextLabel")
-text_label.Size = UDim2.new(1, 0, 0, 24)
-text_label.Position = UDim2.new(0.5, 0, 0.5, 366)
-text_label.AnchorPoint = Vector2.new(0.5, 0.5)
-text_label.BackgroundTransparency = 1
-text_label.Text = Config.Miscelaneous.KeyDisplay.Title
-text_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Faze Title']
-text_label.TextSize = 18.2
-text_label.Font = Enum.Font.GothamBold
-text_label.ZIndex = 10
-text_label.Parent = key_display
-
-local text_stroke = Instance.new("UIStroke")
-text_stroke.Thickness = 0.8
-text_stroke.Color = Color3.fromRGB(0, 0, 0)
-text_stroke.Parent = text_label
-
-local text_shadow = Instance.new("TextLabel")
-text_shadow.Size = UDim2.new(1, 0, 0, 24)
-text_shadow.Position = UDim2.new(0.5, 2, 0.5, 368)
-text_shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-text_shadow.BackgroundTransparency = 1
-text_shadow.Text = Config.Miscelaneous.KeyDisplay.Title
-text_shadow.TextColor3 = Color3.fromRGB(0, 0, 0)
-text_shadow.TextTransparency = 0.5
-text_shadow.TextSize = 18.2
-text_shadow.Font = Enum.Font.GothamBold
-text_shadow.ZIndex = 9
-text_shadow.Parent = key_display
-
-local features_label = Instance.new("TextLabel")
-features_label.Size = UDim2.new(1, 0, 0, 40)
-features_label.Position = UDim2.new(0.5, 0, 0.5, 381)
-features_label.AnchorPoint = Vector2.new(0.5, 0.5)
-features_label.BackgroundTransparency = 1
-features_label.Text = "Silent | Trigger | ESP"
-features_label.TextColor3 = Color3.fromRGB(255, 255, 255)
-features_label.TextSize = 12.3
-features_label.Font = Enum.Font.GothamBold
-features_label.ZIndex = 10
-features_label.Parent = key_display
-
-local features_stroke = Instance.new("UIStroke")
-features_stroke.Thickness = 0.8
-features_stroke.Color = Color3.fromRGB(0, 0, 0)
-features_stroke.Parent = features_label
-
-local features_shadow = Instance.new("TextLabel")
-features_shadow.Size = UDim2.new(1, 0, 0, 40)
-features_shadow.Position = UDim2.new(0.5, 2, 0.5, 383)
-features_shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-features_shadow.BackgroundTransparency = 1
-features_shadow.Text = "Silent | Trigger | ESP"
-features_shadow.TextColor3 = Color3.fromRGB(255, 255, 255)
-features_shadow.TextTransparency = 0.5
-features_shadow.TextSize = 12.3
-features_shadow.Font = Enum.Font.GothamBold
-features_shadow.ZIndex = 9
-features_shadow.Parent = key_display
-
-local target_label = Instance.new("TextLabel")
-target_label.Size = UDim2.new(1, 0, 0, 20)
-target_label.Position = UDim2.new(0.5, 0, 0.5, 394.2)
-target_label.AnchorPoint = Vector2.new(0.5, 0.5)
-target_label.BackgroundTransparency = 1
-target_label.Text = ""
-target_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
-target_label.TextSize = 13.5
-target_label.Font = Enum.Font.GothamBold
-target_label.ZIndex = 10
-target_label.Parent = key_display
-
-local target_stroke = Instance.new("UIStroke")
-target_stroke.Thickness = 0.8
-target_stroke.Color = Color3.fromRGB(0, 0, 0)
-target_stroke.Parent = target_label
-
-local target_shadow = Instance.new("TextLabel")
-target_shadow.Size = UDim2.new(1, 0, 0, 20)
-target_shadow.Position = UDim2.new(0.5, 2, 0.5, 396.2)
-target_shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-target_shadow.BackgroundTransparency = 1
-target_shadow.Text = ""
-target_shadow.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
-target_shadow.TextTransparency = 0.5
-target_shadow.TextSize = 13.5
-target_shadow.Font = Enum.Font.GothamBold
-target_shadow.ZIndex = 9
-target_shadow.Parent = key_display
-
-local function update_features_display(active)
-    if active then
-        features_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
-        features_shadow.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
-    else
-        features_label.TextColor3 = Color3.fromRGB(255, 255, 255)
-        features_shadow.TextColor3 = Color3.fromRGB(255, 255, 255)
+function MasterUnload:UnloadAll()
+    for _, Module in pairs(self.Modules) do pcall(function() if Module.Unload then Module:Unload() end end) end
+    for _, Connection in pairs(self.Connections) do pcall(function() Connection:Disconnect() end) end
+    for _, Instance in pairs(self.Instances) do pcall(function() if Instance and Instance.Parent then Instance:Destroy() end end) end
+    if LocalPlayer.Character then
+        local Humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if Humanoid then Humanoid.WalkSpeed = 16; Humanoid.JumpPower = 50 end
     end
+    for _, Gui in pairs(CoreGui:GetChildren()) do if Gui.Name:find("phase") then pcall(function() Gui:Destroy() end) end end
+    local MT = getrawmetatable(Mouse)
+    if MT and MT.__index then setreadonly(MT, false); MT.__index = nil; setreadonly(MT, true) end
 end
 
-local function update_target_display(name)
-    if name then
-        target_label.Text = name
-        target_shadow.Text = name
-    else
-        target_label.Text = ""
-        target_shadow.Text = ""
-    end
-end
-
-local function update_features_text()
-    local text_parts = {}
-    if Config['Silent Aim'].Enabled then table.insert(text_parts, "Silent") end
-    if Config['Trigger Bot'].Enabled then table.insert(text_parts, "Trigger") end
-    if Config['Aim Assist'].Enabled then table.insert(text_parts, "Aim") end
-    if Config.ESP.Enabled then table.insert(text_parts, "ESP") end
-    if speed_enabled then table.insert(text_parts, "Speed") end
-    if superjump_enabled then table.insert(text_parts, "Jump") end
-    
-    local display_text = #text_parts > 0 and table.concat(text_parts, " | ") or "faze.cc"
-    features_label.Text = display_text
-    features_shadow.Text = display_text
-end
-
-local esp_gui = Instance.new("ScreenGui")
-esp_gui.Name = "faze_esp"
-esp_gui.Parent = game:GetService("CoreGui")
-
-local function is_alive(plr)
-    if not plr or not plr.Character then return false end
-    local hum = plr.Character:FindFirstChild("Humanoid")
-    return hum and hum.Health > 0
-end
-
-local function check_conditions(plr)
-    local checks = Config.Checks['For Features']
-    if not is_alive(plr) then return false end
-    if checks.Knocked then
-        local be = plr.Character:FindFirstChild("BodyEffects")
-        if be then
-            if be:FindFirstChild("K.O") and be["K.O"].Value then return false end
-            if be:FindFirstChild("Knocked") and be.Knocked.Value then return false end
+local function IsAlive(Player)
+    if not Player or not Player.Character then return false end
+    local Humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
+    if not Humanoid or Humanoid.Health <= 0 then return false end
+    if shared.phase.Checks.Knocked then
+        local BodyEffects = Player.Character:FindFirstChild("BodyEffects")
+        if BodyEffects then
+            if BodyEffects:FindFirstChild("K.O") and BodyEffects["K.O"].Value then return false end
+            if BodyEffects:FindFirstChild("Knocked") and BodyEffects.Knocked.Value then return false end
         end
     end
-    if checks.Grabbed and plr.Character:FindFirstChild("GRABBING_CONSTRAINT") then return false end
-    if checks.Forcefield and plr.Character:FindFirstChild("ForceField") then return false end
-    if checks['Self Knocked'] then
-        local be = localplayer.Character and localplayer.Character:FindFirstChild("BodyEffects")
-        if be then
-            if be:FindFirstChild("K.O") and be["K.O"].Value then return false end
-            if be:FindFirstChild("Knocked") and be.Knocked.Value then return false end
-        end
-    end
+    if shared.phase.Checks.Forcefield then if Player.Character:FindFirstChildOfClass("ForceField") then return false end end
     return true
 end
 
-local function get_closest_player()
-    local closest, best = nil, 100
-    local mouse_pos = uis:GetMouseLocation()
-    for _, plr in ipairs(players:GetPlayers()) do
-        if plr ~= localplayer and check_conditions(plr) then
-            local part = plr.Character:FindFirstChild("Head") or plr.Character:FindFirstChild("HumanoidRootPart")
-            if part then
-                local pos, onscreen = camera:WorldToViewportPoint(part.Position)
-                if onscreen then
-                    local dist = (Vector2.new(pos.X, pos.Y) - mouse_pos).Magnitude
-                    if dist < best then best = dist; closest = plr end
+local function GetClosestPlayer()
+    local Closest, Best = nil, shared.phase['Silent Aim'].FOV.Radius
+    local MousePos = UserInputService:GetMouseLocation()
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and IsAlive(Player) then
+            local Head = Player.Character:FindFirstChild("Head")
+            if Head then
+                local Pos, On = Camera:WorldToViewportPoint(Head.Position)
+                if On then
+                    local Dist = (Vector2.new(Pos.X, Pos.Y) - MousePos).Magnitude
+                    if Dist < Best then Best = Dist; Closest = Player end
                 end
             end
         end
     end
-    return closest
+    return Closest
 end
 
-local function create_esp(plr)
-    if not plr.Character then return end
-    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    if esp_cache[plr] then esp_cache[plr]:Destroy() end
-    local bill = Instance.new("BillboardGui")
-    bill.Size = UDim2.new(0, 100, 0, 40)
-    bill.StudsOffset = Vector3.new(0, -3.5, 0)
-    bill.AlwaysOnTop = true
-    bill.MaxDistance = Config.ESP.Settings['Max Distance']
-    bill.Parent = hrp
+local Target = nil
+
+local HUD = {Enabled = true, UIObjects = {}, ActiveFeatures = {}}
+
+function HUD:Create()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "phase_hud"
+    ScreenGui.Parent = CoreGui
+    MasterUnload:RegisterInstance(ScreenGui)
     
-    local display = Instance.new("TextLabel")
-    display.Name = "Display"
-    display.Size = UDim2.new(1, 0, 0.33, 0)
-    display.BackgroundTransparency = 1
-    display.Text = plr.DisplayName
-    display.TextColor3 = (plr == targeted_player) and Config.ESP.Settings.Names['Target Color'] or Config.ESP.Settings.Names.Color
-    display.TextSize = 11
-    display.Font = Enum.Font.FredokaOne
-    display.TextStrokeTransparency = 0.5
-    display.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    display.Parent = bill
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Size = UDim2.new(1, 0, 0, 24)
+    TitleLabel.Position = UDim2.new(0.5, 0, 0.5, 366)
+    TitleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = shared.phase.Miscelaneous['Key Display'].Title
+    TitleLabel.TextColor3 = shared.phase.Miscelaneous['Key Display']['Key Color']
+    TitleLabel.TextSize = 18.2
+    TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.ZIndex = 10
+    TitleLabel.Parent = ScreenGui
+    Instance.new("UIStroke", TitleLabel).Thickness = 0.8
     
-    local username = Instance.new("TextLabel")
-    username.Name = "Username"
-    username.Size = UDim2.new(1, 0, 0.33, 0)
-    username.Position = UDim2.new(0, 0, 0.33, -2)
-    username.BackgroundTransparency = 1
-    username.Text = "@" .. plr.Name
-    username.TextColor3 = (plr == targeted_player) and Config.ESP.Settings.Names['Target Color'] or Config.ESP.Settings.Names.Color
-    username.TextSize = 10
-    username.Font = Enum.Font.FredokaOne
-    username.TextStrokeTransparency = 0.6
-    username.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    username.TextTransparency = 0.4
-    username.Parent = bill
+    local FeaturesLabel = Instance.new("TextLabel")
+    FeaturesLabel.Size = UDim2.new(1, 0, 0, 24)
+    FeaturesLabel.Position = UDim2.new(0.5, 0, 0.5, 385)
+    FeaturesLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+    FeaturesLabel.BackgroundTransparency = 1
+    FeaturesLabel.Text = ""
+    FeaturesLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FeaturesLabel.TextSize = 13
+    FeaturesLabel.Font = Enum.Font.GothamBold
+    FeaturesLabel.ZIndex = 10
+    FeaturesLabel.Parent = ScreenGui
+    Instance.new("UIStroke", FeaturesLabel).Thickness = 0.8
     
-    if Config.ESP.Settings.Health.Enabled then
-        local health = Instance.new("TextLabel")
-        health.Name = "Health"
-        health.Size = UDim2.new(1, 0, 0.33, 0)
-        health.Position = UDim2.new(0, 0, 0.66, -2)
-        health.BackgroundTransparency = 1
-        health.Text = "HP " .. math.floor(plr.Character.Humanoid.Health)
-        health.TextColor3 = Config.ESP.Settings.Health.Color
-        health.TextSize = 10
-        health.Font = Enum.Font.FredokaOne
-        health.TextStrokeTransparency = 0.6
-        health.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        health.Parent = bill
-    end
+    local TargetLabel = Instance.new("TextLabel")
+    TargetLabel.Size = UDim2.new(1, 0, 0, 20)
+    TargetLabel.Position = UDim2.new(0.5, 0, 0.5, 400)
+    TargetLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+    TargetLabel.BackgroundTransparency = 1
+    TargetLabel.Text = ""
+    TargetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TargetLabel.TextSize = 13.5
+    TargetLabel.Font = Enum.Font.GothamBold
+    TargetLabel.ZIndex = 10
+    TargetLabel.Parent = ScreenGui
+    Instance.new("UIStroke", TargetLabel).Thickness = 0.8
     
-    esp_cache[plr] = bill
+    self.UIObjects = {FeaturesLabel = FeaturesLabel, TargetLabel = TargetLabel}
 end
 
-local function refresh_esp()
-    if not Config.ESP.Enabled then
-        for _, bill in pairs(esp_cache) do bill:Destroy() end
-        esp_cache = {}
-        return
-    end
-    for plr, bill in pairs(esp_cache) do
-        if not plr or not plr.Parent or not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then
-            pcall(function() bill:Destroy() end)
-            esp_cache[plr] = nil
-        end
-    end
-    for _, plr in ipairs(players:GetPlayers()) do
-        if plr ~= localplayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and is_alive(plr) then
-            if not esp_cache[plr] then
-                create_esp(plr)
-            else
-                local bill = esp_cache[plr]
-                local display = bill:FindFirstChild("Display")
-                local username = bill:FindFirstChild("Username")
-                local health = bill:FindFirstChild("Health")
-                if display then
-                    display.TextColor3 = (plr == targeted_player) and Config.ESP.Settings.Names['Target Color'] or Config.ESP.Settings.Names.Color
-                end
-                if username then
-                    username.TextColor3 = (plr == targeted_player) and Config.ESP.Settings.Names['Target Color'] or Config.ESP.Settings.Names.Color
-                end
-                if health and Config.ESP.Settings.Health.Enabled then
-                    health.Text = "HP " .. math.floor(plr.Character.Humanoid.Health)
-                end
-            end
-        end
-    end
+function HUD:UpdateFeatures()
+    local Active = {}
+    if shared.phase['Silent Aim'].Enabled then table.insert(Active, "Silent") end
+    if shared.phase['Trigger Bot'].Enabled then table.insert(Active, "Trigger") end
+    if shared.phase.ESP.Enabled then table.insert(Active, "ESP") end
+    if shared.phase['Local Player'].Speed.Enabled then table.insert(Active, "Speed") end
+    if shared.phase['Camera Lock'].Enabled then table.insert(Active, "Cam") end
+    if shared.phase['Hitbox Expander'].Enabled then table.insert(Active, "Hitbox") end
+    if shared.phase['Infinite Range'].Enabled then table.insert(Active, "InfRange") end
+    if shared.phase['Gun Modifications']['Instant Fire'].Enabled then table.insert(Active, "Rapid") end
+    local Text = table.concat(Active, " | ")
+    if Text == "" then Text = "phase.cc" end
+    self.UIObjects.FeaturesLabel.Text = Text
 end
 
-local mt = getrawmetatable(mouse)
-local old_index = mt.__index
-setreadonly(mt, false)
-
-mt.__index = function(self, key)
-    if key == "Hit" then
-        if Config['Silent Aim'].Enabled and targeted_player and is_alive(targeted_player) then
-            local part = targeted_player.Character:FindFirstChild(Config['Silent Aim'].Settings['Hit Part']) or targeted_player.Character:FindFirstChild("HumanoidRootPart")
-            if part then return part.CFrame end
-        elseif Config['Force Hit'].Enabled and targeted_player and is_alive(targeted_player) then
-            local part = targeted_player.Character:FindFirstChild(Config['Force Hit'].Settings['Hit Part']) or targeted_player.Character:FindFirstChild("HumanoidRootPart")
-            if part then return part.CFrame end
-        end
-    end
-    return old_index(self, key)
-end
-
-setreadonly(mt, true)
-
-local function is_target_in_fov()
-    if not targeted_player or not is_alive(targeted_player) then return false end
-    local head = targeted_player.Character:FindFirstChild("Head") or targeted_player.Character:FindFirstChild("HumanoidRootPart")
-    if not head then return false end
-    local pos, onscreen = camera:WorldToViewportPoint(head.Position)
-    if not onscreen then return false end
-    local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
-    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-    return dist < Config['Trigger Bot'].Settings.FOV.Radius
-end
-
-local function fire_weapon()
-    local char = localplayer.Character
-    if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then return end
-    if tool.Name == "[Knife]" then return end
-    tool:Activate()
-end
-
-local function get_closest_aim_assist()
-    local closest, best = nil, Config['Aim Assist'].Settings.FOV.Radius
-    local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
-    for _, plr in ipairs(players:GetPlayers()) do
-        if plr ~= localplayer and check_conditions(plr) then
-            local part = plr.Character:FindFirstChild(Config['Aim Assist'].Settings.Part) or plr.Character:FindFirstChild("HumanoidRootPart")
-            if part then
-                local pos, onscreen = camera:WorldToViewportPoint(part.Position)
-                if onscreen then
-                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if dist < best then best = dist; closest = plr end
-                end
-            end
-        end
-    end
-    return closest
-end
-
-local function getrapidgun()
-    local char = localplayer.Character
-    if not char then return nil end
-    for _, tool in next, char:GetChildren() do
-        if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
-            return tool
-        end
-    end
-    return nil
-end
-
-local function rapidfire()
-    if not Config['Gun Modifications'].Taps.Enabled then
-        isfiring = false
-        return
-    end
-    if not isfiring then return end
-    if tick() - lastrapidfire < 0.01 then return end
-    local gun = getrapidgun()
-    if not gun then return end
-    local tap_count = Config['Gun Modifications'].Taps[gun.Name]
-    if tap_count and tap_count > 1 then
-        for i = 1, tap_count do
-            gun:Activate()
-        end
+function HUD:SetTarget(Name, Active)
+    if Name and Active then
+        self.UIObjects.TargetLabel.Text = Name
+        self.UIObjects.TargetLabel.TextColor3 = shared.phase.Miscelaneous['Key Display']['Key Color']
+    elseif Name and not Active then
+        self.UIObjects.TargetLabel.Text = Name
+        self.UIObjects.TargetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     else
-        gun:Activate()
+        self.UIObjects.TargetLabel.Text = ""
     end
-    lastrapidfire = tick()
 end
 
-local function touchingwall()
-    local char = localplayer.Character
-    if not char then return false end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    local params = RaycastParams.new()
-    params.FilterDescendantsInstances = {char}
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    local dirs = {hrp.CFrame.LookVector, -hrp.CFrame.LookVector, hrp.CFrame.RightVector, -hrp.CFrame.RightVector}
-    for _, d in pairs(dirs) do
-        local ray = workspace:Raycast(hrp.Position, d * 2.5, params)
-        if ray then return true end
+function HUD:Start()
+    self:Create()
+    self:UpdateFeatures()
+    MasterUnload:RegisterModule(self)
+end
+
+function HUD:Unload() self.Enabled = false end
+
+local ESP = {Enabled = true, ESPCache = {}, Connections = {}}
+
+function ESP:CreateESP(Player)
+    local HRP = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
+    if self.ESPCache[Player] then pcall(function() self.ESPCache[Player]:Destroy() end) end
+    
+    local Billboard = Instance.new("BillboardGui")
+    Billboard.Size = UDim2.new(0, 100, 0, 30)
+    Billboard.StudsOffset = Vector3.new(0, -3, 0)
+    Billboard.AlwaysOnTop = true
+    Billboard.MaxDistance = 500
+    Billboard.Parent = HRP
+    MasterUnload:RegisterInstance(Billboard)
+    
+    local Display = Instance.new("TextLabel")
+    Display.Size = UDim2.new(1, 0, 0.5, 0)
+    Display.BackgroundTransparency = 1
+    Display.Text = Player.DisplayName
+    Display.TextColor3 = (Player == Target) and shared.phase.ESP.Names['Target Color'] or shared.phase.ESP.Names.Color
+    Display.TextSize = 12
+    Display.Font = Enum.Font.GothamBold
+    Display.TextStrokeTransparency = 0.5
+    Display.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    Display.Parent = Billboard
+    
+    local Username = Instance.new("TextLabel")
+    Username.Size = UDim2.new(1, 0, 0.5, 0)
+    Username.Position = UDim2.new(0, 0, 0.5, -2)
+    Username.BackgroundTransparency = 1
+    Username.Text = "@" .. Player.Name
+    Username.TextColor3 = (Player == Target) and shared.phase.ESP.Names['Target Color'] or shared.phase.ESP.Names.Color
+    Username.TextSize = 10
+    Username.Font = Enum.Font.GothamBold
+    Username.TextStrokeTransparency = 0.6
+    Username.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    Username.TextTransparency = 0.3
+    Username.Parent = Billboard
+    
+    self.ESPCache[Player] = Billboard
+end
+
+function ESP:Refresh()
+    if not shared.phase.ESP.Enabled then return end
+    for Player, Billboard in pairs(self.ESPCache) do
+        if not Player or not Player.Parent or not IsAlive(Player) then
+            pcall(function() Billboard:Destroy() end)
+            self.ESPCache[Player] = nil
+        end
     end
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and IsAlive(Player) then
+            if not self.ESPCache[Player] then self:CreateESP(Player) end
+            local Billboard = self.ESPCache[Player]
+            if Billboard then
+                for _, Label in pairs(Billboard:GetChildren()) do
+                    if Label:IsA("TextLabel") then
+                        Label.TextColor3 = (Player == Target) and shared.phase.ESP.Names['Target Color'] or shared.phase.ESP.Names.Color
+                    end
+                end
+            end
+        end
+    end
+    if Target and not IsAlive(Target) then Target = nil; HUD:SetTarget(nil, false) end
+end
+
+function ESP:Start()
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer then
+            Player.CharacterAdded:Connect(function(Char)
+                Char:WaitForChild("HumanoidRootPart", 10)
+                task.wait(0.5)
+                if IsAlive(Player) then self:CreateESP(Player) end
+            end)
+        end
+    end
+    Players.PlayerAdded:Connect(function(Player)
+        if Player ~= LocalPlayer then
+            Player.CharacterAdded:Connect(function(Char)
+                Char:WaitForChild("HumanoidRootPart", 10)
+                task.wait(0.5)
+                if IsAlive(Player) then self:CreateESP(Player) end
+            end)
+        end
+    end)
+    local Conn = RunService.RenderStepped:Connect(function() self:Refresh() end)
+    table.insert(self.Connections, Conn)
+    MasterUnload:RegisterConnection(Conn)
+    MasterUnload:RegisterModule(self)
+end
+
+function ESP:Unload()
+    shared.phase.ESP.Enabled = false
+    for _, Billboard in pairs(self.ESPCache) do pcall(function() Billboard:Destroy() end) end
+    self.ESPCache = {}
+end
+
+local SilentAim = {Enabled = true}
+function SilentAim:Setup()
+    local MT = getrawmetatable(Mouse)
+    local Old = MT.__index
+    setreadonly(MT, false)
+    MT.__index = function(Self, Key)
+        if Key == "Hit" and shared.phase['Silent Aim'].Enabled and Target and IsAlive(Target) then
+            local Head = Target.Character:FindFirstChild("Head")
+            if Head then return Head.CFrame end
+        end
+        return Old(Self, Key)
+    end
+    setreadonly(MT, true)
+end
+function SilentAim:Start() self:Setup() end
+
+local TriggerBot = {Enabled = false, LastFire = 0}
+function TriggerBot:Update()
+    if not shared.phase['Trigger Bot'].Enabled then return end
+    if not Target or not IsAlive(Target) then return end
+    local Now = tick()
+    if Now - self.LastFire < shared.phase['Trigger Bot'].Delay then return end
+    local Tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if Tool then Tool:Activate(); self.LastFire = Now end
+end
+function TriggerBot:Start()
+    local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
+    MasterUnload:RegisterConnection(Conn)
+end
+
+local Speed = {Enabled = false}
+function Speed:Update()
+    if not shared.phase['Local Player'].Speed.Enabled then return end
+    local Char = LocalPlayer.Character
+    if Char then
+        local Hum = Char:FindFirstChildOfClass("Humanoid")
+        if Hum then Hum.WalkSpeed = 16 * shared.phase['Local Player'].Speed.Multiplier end
+    end
+end
+function Speed:Start()
+    local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
+    MasterUnload:RegisterConnection(Conn)
+end
+function Speed:Unload()
+    shared.phase['Local Player'].Speed.Enabled = false
+    local Char = LocalPlayer.Character
+    if Char then local Hum = Char:FindFirstChildOfClass("Humanoid"); if Hum then Hum.WalkSpeed = 16 end end
+end
+
+local CamLock = {Enabled = false}
+function CamLock:Update()
+    if not shared.phase['Camera Lock'].Enabled then return end
+    if not Target or not IsAlive(Target) then return end
+    local Head = Target.Character:FindFirstChild("Head")
+    if not Head then return end
+    local Pos = Head.Position
+    local HRP = Target.Character:FindFirstChild("HumanoidRootPart")
+    if HRP then Pos = Pos + HRP.Velocity * shared.phase['Camera Lock'].Prediction end
+    local TargetCF = CFrame.new(Camera.CFrame.Position, Pos)
+    Camera.CFrame = Camera.CFrame:Lerp(TargetCF, shared.phase['Camera Lock'].Smoothing)
+end
+function CamLock:Start()
+    local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
+    MasterUnload:RegisterConnection(Conn)
+end
+
+local Jump = {Enabled = false}
+function Jump:Update()
+    if not shared.phase['Local Player'].Jump.Enabled then return end
+    local Char = LocalPlayer.Character
+    if Char then
+        local Hum = Char:FindFirstChildOfClass("Humanoid")
+        if Hum then Hum.JumpPower = 50 * shared.phase['Local Player'].Jump.Multiplier end
+    end
+end
+function Jump:Start()
+    local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
+    MasterUnload:RegisterConnection(Conn)
+end
+function Jump:Unload()
+    shared.phase['Local Player'].Jump.Enabled = false
+    local Char = LocalPlayer.Character
+    if Char then local Hum = Char:FindFirstChildOfClass("Humanoid"); if Hum then Hum.JumpPower = 50 end end
+end
+
+local WallJump = {Enabled = false, HasWallJumped = false}
+function WallJump:IsTouchingWall()
+    local Char = LocalPlayer.Character
+    if not Char then return false end
+    local HRP = Char:FindFirstChild("HumanoidRootPart")
+    if not HRP then return false end
+    local RayParams = RaycastParams.new()
+    RayParams.FilterDescendantsInstances = {Char}
+    RayParams.FilterType = Enum.RaycastFilterType.Exclude
+    local Dirs = {HRP.CFrame.LookVector * 3, -HRP.CFrame.LookVector * 3, HRP.CFrame.RightVector * 3, -HRP.CFrame.RightVector * 3}
+    for _, Dir in pairs(Dirs) do if Workspace:Raycast(HRP.Position, Dir, RayParams) then return true end end
     return false
 end
-
-local function getspidermanjumppower()
-    local char = localplayer.Character
-    if not char then return Config['Local Player'].Spiderman['Jump Power'] end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool and tool.Name == "[Knife]" then
-        return Config['Local Player'].Spiderman['Knife Jump Power']
-    end
-    return Config['Local Player'].Spiderman['Jump Power']
-end
-
-local function setupwalljumpreset()
-    if walljumpconnection then walljumpconnection:Disconnect() end
-    haswalljumped = false
-    local char = localplayer.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-    walljumpconnection = hum.StateChanged:Connect(function(old, new)
-        if new == Enum.HumanoidStateType.Landed or new == Enum.HumanoidStateType.Running then
-            haswalljumped = false
+function WallJump:Perform()
+    if not shared.phase['Local Player'].WallJump.Enabled then return end
+    local Char = LocalPlayer.Character
+    if not Char then return end
+    local Hum = Char:FindFirstChildOfClass("Humanoid")
+    local HRP = Char:FindFirstChild("HumanoidRootPart")
+    if not Hum or not HRP then return end
+    local State = Hum:GetState()
+    if State == Enum.HumanoidStateType.Freefall or State == Enum.HumanoidStateType.Jumping then
+        if self:IsTouchingWall() and not self.HasWallJumped then
+            self.HasWallJumped = true
+            Hum.Jump = true
+            HRP.Velocity = Vector3.new(HRP.Velocity.X, 50 * shared.phase['Local Player'].WallJump.Multiplier, HRP.Velocity.Z)
         end
+    end
+end
+function WallJump:Start()
+    local Conn = LocalPlayer.CharacterAdded:Connect(function(Char)
+        self.HasWallJumped = false
+        local Hum = Char:WaitForChild("Humanoid")
+        Hum.StateChanged:Connect(function(_, New) if New == Enum.HumanoidStateType.Landed then self.HasWallJumped = false end end)
     end)
+    MasterUnload:RegisterConnection(Conn)
+    if LocalPlayer.Character then
+        local Hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if Hum then Hum.StateChanged:Connect(function(_, New) if New == Enum.HumanoidStateType.Landed then self.HasWallJumped = false end end) end
+    end
 end
 
-local function applyheadless(char)
-    if not Config['Local Player'].Headless.Enabled then return end
-    local head = char:FindFirstChild("Head")
-    if head then
-        head.Transparency = 1
-        local face = head:FindFirstChild("face")
-        if face then face.Transparency = 1 end
-    end
-    if Config['Local Player'].Headless['Remove Face Accessories'] then
-        for _, acc in ipairs(char:GetChildren()) do
-            if acc:IsA("Accessory") and acc.AccessoryType == Enum.AccessoryType.Face then
-                local handle = acc:FindFirstChild("Handle")
-                if handle then handle.Transparency = 1 end
+local AntiFling = {Enabled = false}
+function AntiFling:Update()
+    if not shared.phase['Local Player'].AntiFling.Enabled then return end
+    local Char = LocalPlayer.Character
+    if not Char then return end
+    local HRP = Char:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
+    local Vel = HRP.Velocity
+    if Vel.Y > 50 or Vel.Y < -50 then HRP.Velocity = Vector3.new(Vel.X, 0, Vel.Z) end
+end
+function AntiFling:Start()
+    local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
+    MasterUnload:RegisterConnection(Conn)
+end
+
+local HitboxExpander = {Enabled = false, OriginalSizes = {}}
+function HitboxExpander:Update()
+    if not shared.phase['Hitbox Expander'].Enabled then return end
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and IsAlive(Player) then
+            local HRP = Player.Character:FindFirstChild("HumanoidRootPart")
+            if HRP then
+                if not self.OriginalSizes[Player] then self.OriginalSizes[Player] = HRP.Size end
+                HRP.Size = Vector3.new(shared.phase['Hitbox Expander'].Size, shared.phase['Hitbox Expander'].Size, shared.phase['Hitbox Expander'].Size)
+                HRP.Transparency = 0.7
+                HRP.BrickColor = BrickColor.new("Bright red")
+                HRP.Material = "Neon"
+                HRP.CanCollide = false
             end
         end
     end
 end
-
-run.RenderStepped:Connect(function()
-    if Config['Trigger Bot'].Enabled and trigger_enabled then
-        local now = tick()
-        if now - last_trigger >= Config['Trigger Bot'].Delay then
-            if targeted_player and is_alive(targeted_player) and is_target_in_fov() then
-                fire_weapon()
-                last_trigger = now
-            end
-        end
-        local mp = uis:GetMouseLocation()
-        fov_circle.Position = UDim2.new(0, mp.X - Config['Trigger Bot'].Settings.FOV.Radius, 0, mp.Y - Config['Trigger Bot'].Settings.FOV.Radius)
-    end
-    
-    if Config['Aim Assist'].Enabled and aim_assist_active then
-        local target = get_closest_aim_assist()
-        if target and target.Character then
-            local part = target.Character:FindFirstChild(Config['Aim Assist'].Settings.Part) or target.Character:FindFirstChild("HumanoidRootPart")
-            if part then
-                local cf = CFrame.new(camera.CFrame.Position, part.Position)
-                camera.CFrame = camera.CFrame:Lerp(cf, Config['Aim Assist'].Settings.Sharpness)
-            end
+function HitboxExpander:Start()
+    local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
+    MasterUnload:RegisterConnection(Conn)
+end
+function HitboxExpander:Unload()
+    shared.phase['Hitbox Expander'].Enabled = false
+    for Player, Size in pairs(self.OriginalSizes) do
+        if Player and Player.Character then
+            local HRP = Player.Character:FindFirstChild("HumanoidRootPart")
+            if HRP then HRP.Size = Size; HRP.Transparency = 1 end
         end
     end
-    
-    if Config['Local Player'].Speed.Enabled and speed_enabled then
-        local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
-        if hum then
-            hum.WalkSpeed = 16 * Config['Local Player'].Speed.Multiplier
-        end
-    end
-    
-    if Config['Local Player'].SuperJump.Enabled and superjump_enabled then
-        local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
-        if hum then
-            hum.JumpPower = Config['Local Player'].SuperJump['Jump Power']
-        end
-    end
-    
-    refresh_esp()
-    rapidfire()
-end)
-
-uis.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    local key = input.KeyCode
-    
-    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds.Selection] then
-        targeted_player = get_closest_player()
-        if targeted_player then
-            update_target_display(targeted_player.Name)
-            update_features_display(true)
-        end
-    end
-    
-    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Clear Target']] then
-        targeted_player = nil
-        update_target_display(nil)
-        update_features_display(false)
-    end
-    
-    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Trigger Bot']] then
-        trigger_enabled = not trigger_enabled
-        fov_circle.Visible = trigger_enabled and Config['Trigger Bot'].Settings.FOV.Visible
-        update_features_text()
-    end
-    
-    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Aim Assist']] then
-        aim_assist_active = not aim_assist_active
-        update_features_text()
-    end
-    
-    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds.Speed] then
-        speed_enabled = not speed_enabled
-        if not speed_enabled then
-            local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
-            if hum then hum.WalkSpeed = 16 end
-        end
-        update_features_text()
-    end
-    
-    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Super Jump']] then
-        superjump_enabled = not superjump_enabled
-        if not superjump_enabled then
-            local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
-            if hum then hum.JumpPower = 50 end
-        end
-        update_features_text()
-    end
-    
-    if key == Enum.KeyCode.Space and Config['Local Player'].Spiderman.Enabled then
-        local char = localplayer.Character
-        if char then
-            local hum = char:FindFirstChild("Humanoid")
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if hum and hrp and hum:GetState() == Enum.HumanoidStateType.Freefall and touchingwall() and not haswalljumped then
-                haswalljumped = true
-                hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, getspidermanjumppower(), hrp.AssemblyLinearVelocity.Z)
-            end
-        end
-    end
-    
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if Config['Gun Modifications'].Taps.Enabled then
-            local gun = getrapidgun()
-            if gun then isfiring = true end
-        end
-    end
-    
-    if key == Enum.KeyCode[Config.Miscelaneous.Keybinds.Unload] then
-        setreadonly(mt, false)
-        mt.__index = old_index
-        setreadonly(mt, true)
-        for _, bill in pairs(esp_cache) do bill:Destroy() end
-        fov_circle:Destroy()
-        esp_gui:Destroy()
-        key_display:Destroy()
-        if walljumpconnection then walljumpconnection:Disconnect() end
-    end
-end)
-
-uis.InputEnded:Connect(function(input, gp)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isfiring = false
-    end
-end)
-
-local function on_player_added(plr)
-    if plr == localplayer then return end
-    plr.CharacterAdded:Connect(function(char)
-        char:WaitForChild("HumanoidRootPart", 10)
-        repeat task.wait(0.1) until is_alive(plr)
-        refresh_esp()
-    end)
-    if plr.Character and is_alive(plr) then
-        refresh_esp()
-    end
+    self.OriginalSizes = {}
 end
 
-for _, plr in ipairs(players:GetPlayers()) do
-    on_player_added(plr)
+local PanicGround = {Enabled = true}
+function PanicGround:Activate()
+    local Char = LocalPlayer.Character
+    if not Char then return end
+    local HRP = Char:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
+    local RayParams = RaycastParams.new()
+    RayParams.FilterDescendantsInstances = {Char}
+    RayParams.FilterType = Enum.RaycastFilterType.Exclude
+    local RayResult = Workspace:Raycast(HRP.Position, Vector3.new(0, -500, 0), RayParams)
+    if RayResult then HRP.CFrame = CFrame.new(RayResult.Position + Vector3.new(0, 3, 0)) end
 end
 
-players.PlayerAdded:Connect(on_player_added)
+local InstantFire = {Enabled = false, Connections = {}, OriginalValues = {}, IsHolding = false, HasFired = false}
+function InstantFire:PatchTool(Tool)
+    if not Tool or not Tool:IsA("Tool") then return end
+    if self.OriginalValues[Tool] then return end
+    local Cooldown = Tool:FindFirstChild("Shooting Cooldown")
+    if Cooldown then self.OriginalValues[Tool] = Cooldown.Value; Cooldown.Value = 0 end
+end
+function InstantFire:UnpatchTools()
+    for Tool, OriginalValue in pairs(self.OriginalValues) do
+        if Tool and Tool.Parent then
+            local Cooldown = Tool:FindFirstChild("Shooting Cooldown")
+            if Cooldown then Cooldown.Value = OriginalValue end
+        end
+    end
+    self.OriginalValues = {}
+end
+function InstantFire:FireBurst(Tool)
+    for i = 1, shared.phase['Gun Modifications']['Instant Fire'].BurstCount do Tool:Activate() end
+end
+function InstantFire:Update()
+    if not shared.phase['Gun Modifications']['Instant Fire'].Enabled then return end
+    local Char = LocalPlayer.Character
+    if Char then
+        local Tool = Char:FindFirstChildOfClass("Tool")
+        if Tool then
+            self:PatchTool(Tool)
+            if self.IsHolding and not self.HasFired then self:FireBurst(Tool); self.HasFired = true end
+        end
+    end
+end
+function InstantFire:Start()
+    local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
+    table.insert(self.Connections, Conn)
+    MasterUnload:RegisterConnection(Conn)
+end
+function InstantFire:Unload()
+    shared.phase['Gun Modifications']['Instant Fire'].Enabled = false
+    self:UnpatchTools()
+end
 
-localplayer.CharacterAdded:Connect(function(char)
-    repeat task.wait(0.1) until is_alive(localplayer)
-    refresh_esp()
-    setupwalljumpreset()
-    applyheadless(char)
-    update_features_text()
+local ForceHit = {Enabled = false}
+function ForceHit:Setup()
+    local MT = getrawmetatable(Mouse)
+    local Old = MT.__index
+    setreadonly(MT, false)
+    MT.__index = function(Self, Key)
+        if Key == "Hit" and shared.phase['Gun Modifications']['Force Hit'].Enabled and Target and IsAlive(Target) then
+            local Head = Target.Character:FindFirstChild("Head")
+            if Head then return Head.CFrame end
+        end
+        return Old(Self, Key)
+    end
+    setreadonly(MT, true)
+end
+function ForceHit:Start() self:Setup() end
+
+local InfRange = {Enabled = true, OriginalValues = {}}
+function InfRange:ModifyWeapon(Tool)
+    if not Tool or not Tool:IsA("Tool") then return end
+    if not self.OriginalValues[Tool] then self.OriginalValues[Tool] = {} end
+    local Range = Tool:FindFirstChild("Range")
+    if Range and typeof(Range.Value) == "number" then
+        if not self.OriginalValues[Tool].Range then self.OriginalValues[Tool].Range = Range.Value end
+        Range.Value = 1000
+    end
+end
+function InfRange:Update()
+    if not shared.phase['Infinite Range'].Enabled then return end
+    local Char = LocalPlayer.Character
+    if Char then local Tool = Char:FindFirstChildOfClass("Tool"); if Tool then self:ModifyWeapon(Tool) end end
+end
+function InfRange:Start()
+    local Conn = RunService.RenderStepped:Connect(function() self:Update() end)
+    MasterUnload:RegisterConnection(Conn)
+end
+
+HUD:Start()
+ESP:Start()
+SilentAim:Start()
+TriggerBot:Start()
+Speed:Start()
+CamLock:Start()
+Jump:Start()
+WallJump:Start()
+AntiFling:Start()
+HitboxExpander:Start()
+InstantFire:Start()
+ForceHit:Start()
+InfRange:Start()
+
+MasterUnload:RegisterModule(Speed)
+MasterUnload:RegisterModule(Jump)
+MasterUnload:RegisterModule(HitboxExpander)
+MasterUnload:RegisterModule(InstantFire)
+
+local Keybinds = shared.phase.Miscelaneous.Keybinds
+
+UserInputService.InputBegan:Connect(function(Input, GameProcessed)
+    if GameProcessed then return end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds.Target] then
+        Target = GetClosestPlayer()
+        if Target then HUD:SetTarget(Target.Name, true) end
+        ESP:Refresh()
+    end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds['Clear Target']] then
+        Target = nil; HUD:SetTarget(nil, false); ESP:Refresh()
+    end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds['Trigger Bot']] then
+        shared.phase['Trigger Bot'].Enabled = not shared.phase['Trigger Bot'].Enabled
+        HUD:UpdateFeatures()
+    end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds.Speed] then
+        shared.phase['Local Player'].Speed.Enabled = not shared.phase['Local Player'].Speed.Enabled
+        HUD:UpdateFeatures()
+        if not shared.phase['Local Player'].Speed.Enabled then Speed:Unload() end
+    end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds['Cam Lock']] then
+        shared.phase['Camera Lock'].Enabled = not shared.phase['Camera Lock'].Enabled
+        HUD:UpdateFeatures()
+    end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds.Jump] then
+        shared.phase['Local Player'].Jump.Enabled = not shared.phase['Local Player'].Jump.Enabled
+        if not shared.phase['Local Player'].Jump.Enabled then Jump:Unload() end
+    end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds['Wall Jump']] then
+        shared.phase['Local Player'].WallJump.Enabled = not shared.phase['Local Player'].WallJump.Enabled
+    end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds['Force Hit']] then
+        shared.phase['Gun Modifications']['Force Hit'].Enabled = not shared.phase['Gun Modifications']['Force Hit'].Enabled
+    end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds['Hitbox Expander']] then
+        shared.phase['Hitbox Expander'].Enabled = not shared.phase['Hitbox Expander'].Enabled
+        HUD:UpdateFeatures()
+        if not shared.phase['Hitbox Expander'].Enabled then HitboxExpander:Unload() end
+    end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds['Panic Ground']] then PanicGround:Activate() end
+    
+    if Input.KeyCode == Enum.KeyCode[Keybinds['Instant Fire']] then
+        shared.phase['Gun Modifications']['Instant Fire'].Enabled = not shared.phase['Gun Modifications']['Instant Fire'].Enabled
+        HUD:UpdateFeatures()
+        if not shared.phase['Gun Modifications']['Instant Fire'].Enabled then InstantFire:Unload() end
+    end
+    
+    if Input.KeyCode == Enum.KeyCode.Space then WallJump:Perform() end
+    
+    if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+        InstantFire.IsHolding = true; InstantFire.HasFired = false
+    end
+    
+    if Input.KeyCode == Enum.KeyCode.End then MasterUnload:UnloadAll() end
 end)
 
-if localplayer.Character then
-    setupwalljumpreset()
-    applyheadless(localplayer.Character)
-end
+UserInputService.InputEnded:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.MouseButton1 then InstantFire.IsHolding = false end
+end)
 
-refresh_esp()
-update_features_text()
+HUD:UpdateFeatures()
