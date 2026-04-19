@@ -1,5 +1,5 @@
 -- Load configuration from file
-local config_code = game:HttpGet("https://raw.githubusercontent.com/yourusername/config/main/config.lua") -- Replace with your actual URL
+local config_code = game:HttpGet("https://raw.githubusercontent.com/surgory/ala/refs/heads/main/main") -- Replace with your actual URL
 loadstring(config_code)()
 
 -- Wait for config to load
