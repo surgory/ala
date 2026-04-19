@@ -22,7 +22,7 @@ local haswalljumped = false
 local walljumpconnection = nil
 
 local fov_circle = Instance.new("Frame")
-fov_circle.Size = UDim2.new(0, Config.TriggerBot.Settings.FOV.Radius * 2, 0, Config.TriggerBot.Settings.FOV.Radius * 2)
+fov_circle.Size = UDim2.new(0, Config['Trigger Bot'].Settings.FOV.Radius * 2, 0, Config['Trigger Bot'].Settings.FOV.Radius * 2)
 fov_circle.BackgroundTransparency = 0.9
 fov_circle.BorderSizePixel = 1
 fov_circle.BorderColor3 = Color3.fromRGB(255, 50, 50)
@@ -291,8 +291,8 @@ setreadonly(mt, false)
 
 mt.__index = function(self, key)
     if key == "Hit" then
-        if Config.SilentAim.Enabled and targeted_player and is_alive(targeted_player) then
-            local part = targeted_player.Character:FindFirstChild(Config.SilentAim.Settings['Hit Part']) or targeted_player.Character:FindFirstChild("HumanoidRootPart")
+        if Config['Silent Aim'].Enabled and targeted_player and is_alive(targeted_player) then
+            local part = targeted_player.Character:FindFirstChild(Config['Silent Aim'].Settings['Hit Part']) or targeted_player.Character:FindFirstChild("HumanoidRootPart")
             if part then return part.CFrame end
         elseif Config['Force Hit'].Enabled and targeted_player and is_alive(targeted_player) then
             local part = targeted_player.Character:FindFirstChild(Config['Force Hit'].Settings['Hit Part']) or targeted_player.Character:FindFirstChild("HumanoidRootPart")
@@ -312,7 +312,7 @@ local function is_target_in_fov()
     if not onscreen then return false end
     local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
     local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-    return dist < Config.TriggerBot.Settings.FOV.Radius
+    return dist < Config['Trigger Bot'].Settings.FOV.Radius
 end
 
 local function fire_weapon()
@@ -325,11 +325,11 @@ local function fire_weapon()
 end
 
 local function get_closest_aim_assist()
-    local closest, best = nil, Config.AimAssist.Settings.FOV.Radius
+    local closest, best = nil, Config['Aim Assist'].Settings.FOV.Radius
     local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
     for _, plr in ipairs(players:GetPlayers()) do
         if plr ~= localplayer and check_conditions(plr) then
-            local part = plr.Character:FindFirstChild(Config.AimAssist.Settings.Part) or plr.Character:FindFirstChild("HumanoidRootPart")
+            local part = plr.Character:FindFirstChild(Config['Aim Assist'].Settings.Part) or plr.Character:FindFirstChild("HumanoidRootPart")
             if part then
                 local pos, onscreen = camera:WorldToViewportPoint(part.Position)
                 if onscreen then
@@ -354,7 +354,7 @@ local function getrapidgun()
 end
 
 local function rapidfire()
-    if not Config.GunModifications.Taps.Enabled then
+    if not Config['Gun Modifications'].Taps.Enabled then
         isfiring = false
         return
     end
@@ -362,7 +362,7 @@ local function rapidfire()
     if tick() - lastrapidfire < 0.01 then return end
     local gun = getrapidgun()
     if not gun then return end
-    local tap_count = Config.GunModifications.Taps[gun.Name]
+    local tap_count = Config['Gun Modifications'].Taps[gun.Name]
     if tap_count and tap_count > 1 then
         for i = 1, tap_count do
             gun:Activate()
@@ -391,12 +391,12 @@ end
 
 local function getspidermanjumppower()
     local char = localplayer.Character
-    if not char then return Config.LocalPlayer.Spiderman['Jump Power'] end
+    if not char then return Config['Local Player'].Spiderman['Jump Power'] end
     local tool = char:FindFirstChildOfClass("Tool")
     if tool and tool.Name == "[Knife]" then
-        return Config.LocalPlayer.Spiderman['Knife Jump Power']
+        return Config['Local Player'].Spiderman['Knife Jump Power']
     end
-    return Config.LocalPlayer.Spiderman['Jump Power']
+    return Config['Local Player'].Spiderman['Jump Power']
 end
 
 local function setupwalljumpreset()
@@ -414,14 +414,14 @@ local function setupwalljumpreset()
 end
 
 local function applyheadless(char)
-    if not Config.LocalPlayer.Headless.Enabled then return end
+    if not Config['Local Player'].Headless.Enabled then return end
     local head = char:FindFirstChild("Head")
     if head then
         head.Transparency = 1
         local face = head:FindFirstChild("face")
         if face then face.Transparency = 1 end
     end
-    if Config.LocalPlayer.Headless['Remove Face Accessories'] then
+    if Config['Local Player'].Headless['Remove Face Accessories'] then
         for _, acc in ipairs(char:GetChildren()) do
             if acc:IsA("Accessory") and acc.AccessoryType == Enum.AccessoryType.Face then
                 local handle = acc:FindFirstChild("Handle")
@@ -432,40 +432,40 @@ local function applyheadless(char)
 end
 
 run.RenderStepped:Connect(function()
-    if Config.TriggerBot.Enabled and trigger_enabled then
+    if Config['Trigger Bot'].Enabled and trigger_enabled then
         local now = tick()
-        if now - last_trigger >= Config.TriggerBot.Delay then
+        if now - last_trigger >= Config['Trigger Bot'].Delay then
             if targeted_player and is_alive(targeted_player) and is_target_in_fov() then
                 fire_weapon()
                 last_trigger = now
             end
         end
         local mp = uis:GetMouseLocation()
-        fov_circle.Position = UDim2.new(0, mp.X - Config.TriggerBot.Settings.FOV.Radius, 0, mp.Y - Config.TriggerBot.Settings.FOV.Radius)
+        fov_circle.Position = UDim2.new(0, mp.X - Config['Trigger Bot'].Settings.FOV.Radius, 0, mp.Y - Config['Trigger Bot'].Settings.FOV.Radius)
     end
     
-    if Config.AimAssist.Enabled and aim_assist_active then
+    if Config['Aim Assist'].Enabled and aim_assist_active then
         local target = get_closest_aim_assist()
         if target and target.Character then
-            local part = target.Character:FindFirstChild(Config.AimAssist.Settings.Part) or target.Character:FindFirstChild("HumanoidRootPart")
+            local part = target.Character:FindFirstChild(Config['Aim Assist'].Settings.Part) or target.Character:FindFirstChild("HumanoidRootPart")
             if part then
                 local cf = CFrame.new(camera.CFrame.Position, part.Position)
-                camera.CFrame = camera.CFrame:Lerp(cf, Config.AimAssist.Settings.Sharpness)
+                camera.CFrame = camera.CFrame:Lerp(cf, Config['Aim Assist'].Settings.Sharpness)
             end
         end
     end
     
-    if Config.LocalPlayer.Speed.Enabled and speed_enabled then
+    if Config['Local Player'].Speed.Enabled and speed_enabled then
         local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
         if hum then
-            hum.WalkSpeed = 16 * Config.LocalPlayer.Speed.Multiplier
+            hum.WalkSpeed = 16 * Config['Local Player'].Speed.Multiplier
         end
     end
     
-    if Config.LocalPlayer.SuperJump.Enabled and superjump_enabled then
+    if Config['Local Player'].SuperJump.Enabled and superjump_enabled then
         local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
         if hum then
-            hum.JumpPower = Config.LocalPlayer.SuperJump['Jump Power']
+            hum.JumpPower = Config['Local Player'].SuperJump['Jump Power']
         end
     end
     
@@ -493,7 +493,7 @@ uis.InputBegan:Connect(function(input, gp)
     
     if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Trigger Bot']] then
         trigger_enabled = not trigger_enabled
-        fov_circle.Visible = trigger_enabled and Config.TriggerBot.Settings.FOV.Visible
+        fov_circle.Visible = trigger_enabled and Config['Trigger Bot'].Settings.FOV.Visible
     end
     
     if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Aim Assist']] then
@@ -516,7 +516,7 @@ uis.InputBegan:Connect(function(input, gp)
         end
     end
     
-    if key == Enum.KeyCode.Space and Config.LocalPlayer.Spiderman.Enabled then
+    if key == Enum.KeyCode.Space and Config['Local Player'].Spiderman.Enabled then
         local char = localplayer.Character
         if char then
             local hum = char:FindFirstChild("Humanoid")
@@ -529,7 +529,7 @@ uis.InputBegan:Connect(function(input, gp)
     end
     
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if Config.GunModifications.Taps.Enabled then
+        if Config['Gun Modifications'].Taps.Enabled then
             local gun = getrapidgun()
             if gun then isfiring = true end
         end
