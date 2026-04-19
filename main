@@ -44,7 +44,6 @@ local function IsAlive(Player)
 end
 
 local function GetClosestPlayer()
-    if not shared.phase['Silent Aim'].Enabled and not shared.phase['Trigger Bot'].Enabled and not shared.phase['Camera Lock'].Enabled then return nil end
     local Closest, Best = nil, shared.phase['Silent Aim'].FOV.Radius
     local MousePos = UserInputService:GetMouseLocation()
     for _, Player in pairs(Players:GetPlayers()) do
@@ -526,6 +525,174 @@ function InfRange:Start()
     MasterUnload:RegisterConnection(Conn)
 end
 
+local MuteGun = {Enabled = shared.phase['Gun Modifications']['Mute Gun Sounds'].Enabled, Connections = {}, MutedSounds = {}}
+function MuteGun:MuteSounds()
+    if not self.Enabled then return end
+    local Char = LocalPlayer.Character
+    if not Char then return end
+    local Tool = Char:FindFirstChildOfClass("Tool")
+    if not Tool then return end
+    for _, Sound in ipairs(Tool:GetDescendants()) do
+        if Sound:IsA("Sound") then
+            if not self.MutedSounds[Sound] then self.MutedSounds[Sound] = Sound.Volume end
+            Sound.Volume = 0
+        end
+    end
+end
+function MuteGun:RestoreSounds()
+    for Sound, Vol in pairs(self.MutedSounds) do if Sound then pcall(function() Sound.Volume = Vol end) end end
+    self.MutedSounds = {}
+end
+function MuteGun:Start()
+    if not self.Enabled then return end
+    local Conn = RunService.Heartbeat:Connect(function() self:MuteSounds() end)
+    table.insert(self.Connections, Conn)
+    MasterUnload:RegisterConnection(Conn)
+    MasterUnload:RegisterModule(self)
+end
+function MuteGun:Unload()
+    self.Enabled = false
+    self:RestoreSounds()
+end
+
+local SkinChanger = {Enabled = shared.phase['Skin Modifications'].Enabled, KnifeData = {}, Connections = {}}
+local KnifeSkins = {
+    ["Golden Age Tanto"] = {SoundId = "rbxassetid://5917819099", AnimationId = "rbxassetid://13473404819", PositionOffset = Vector3.new(0, -0.20, -1.2), RotationOffset = Vector3.new(90, 263.7, 180)}
+}
+function SkinChanger:CleanKnife(Tool)
+    local Data = self.KnifeData[Tool]
+    if Data then
+        if Data.Track then Data.Track:Stop(); Data.Track:Destroy() end
+        if Data.Welds then for _, W in ipairs(Data.Welds) do if W then W:Destroy() end end end
+        if Data.Sounds then for _, S in ipairs(Data.Sounds) do if S then S:Destroy() end end end
+    end
+    local Mesh = Tool:FindFirstChild("Default")
+    if Mesh then
+        for _, Child in ipairs(Mesh:GetChildren()) do
+            if Child.Name == "Handle.R" or Child:IsA("Model") or (Child:IsA("BasePart") and Child.Name ~= "Default") then Child:Destroy() end
+        end
+        Mesh.Transparency = 0
+    end
+    self.KnifeData[Tool] = nil
+end
+function SkinChanger:ApplyKnife(Char, Tool, Skin)
+    local Cfg = KnifeSkins[Skin]
+    if not Cfg then return end
+    local Hum = Char:FindFirstChild("Humanoid")
+    local RHand = Char:FindFirstChild("RightHand")
+    if not Hum or not RHand then return end
+    self:CleanKnife(Tool)
+    self.KnifeData[Tool] = {Track = nil, Welds = {}, Sounds = {}}
+    local Data = self.KnifeData[Tool]
+    local Mesh = Tool:FindFirstChild("Default")
+    if not Mesh then return end
+    Mesh.Transparency = 1
+    local SkinModules = ReplicatedStorage:FindFirstChild("SkinModules")
+    if not SkinModules then return end
+    local Knives = SkinModules:FindFirstChild("Knives")
+    if not Knives then return end
+    local SkinModel = Knives:FindFirstChild(Skin)
+    if not SkinModel then return end
+    local Clone = SkinModel:Clone()
+    Clone.Name = Skin
+    local HandleR = Instance.new("Part")
+    HandleR.Name = "Handle.R"
+    HandleR.Transparency = 1
+    HandleR.CanCollide = false
+    HandleR.Anchored = false
+    HandleR.Size = Vector3.new(0.001, 0.001, 0.001)
+    HandleR.Massless = true
+    HandleR.Parent = Mesh
+    local M6D = Instance.new("Motor6D")
+    M6D.Name = "Handle.R"
+    M6D.Part0 = RHand
+    M6D.Part1 = HandleR
+    M6D.Parent = HandleR
+    local Offset = CFrame.new(Cfg.PositionOffset) * CFrame.Angles(math.rad(Cfg.RotationOffset.X), math.rad(Cfg.RotationOffset.Y), math.rad(Cfg.RotationOffset.Z))
+    if Clone:IsA("Model") then
+        if not Clone.PrimaryPart then for _, C in ipairs(Clone:GetChildren()) do if C:IsA("BasePart") then Clone.PrimaryPart = C; break end end end
+        if Clone.PrimaryPart then
+            for _, P in ipairs(Clone:GetDescendants()) do
+                if P:IsA("BasePart") then
+                    P.CanCollide = false; P.Massless = true; P.Anchored = false
+                    local W = Instance.new("Weld"); W.Part0 = HandleR; W.Part1 = P; W.C0 = Offset; W.C1 = P.CFrame:ToObjectSpace(Clone.PrimaryPart.CFrame); W.Parent = P
+                    table.insert(Data.Welds, W)
+                end
+            end
+        end
+        Clone.Parent = Mesh
+    elseif Clone:IsA("BasePart") then
+        Clone.CanCollide = false; Clone.Massless = true; Clone.Anchored = false; Clone.Parent = Mesh
+        local W = Instance.new("Weld"); W.Part0 = HandleR; W.Part1 = Clone; W.C0 = Offset; W.Parent = Clone
+        table.insert(Data.Welds, W)
+    end
+    local Animator = Hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", Hum)
+    if Cfg.AnimationId and Cfg.AnimationId ~= "" then
+        local Anim = Instance.new("Animation"); Anim.AnimationId = Cfg.AnimationId
+        local Track = Animator:LoadAnimation(Anim); Track.Looped = false; Track:Play(); Data.Track = Track; Anim:Destroy()
+    end
+    if Cfg.SoundId and Cfg.SoundId ~= "" then
+        local Snd = Instance.new("Sound"); Snd.SoundId = Cfg.SoundId; Snd.Parent = Workspace; Snd:Play()
+        table.insert(Data.Sounds, Snd)
+    end
+end
+function SkinChanger:ApplyGun(Tool, Name)
+    local Orig = Tool:FindFirstChildOfClass("MeshPart")
+    if not Orig then return end
+    local SkinModules = ReplicatedStorage:FindFirstChild("SkinModules")
+    if not SkinModules then return end
+    local Success, Req = pcall(function() return require(SkinModules) end)
+    if not Success or not Req then return end
+    local Info = Req[Tool.Name] and Req[Tool.Name][Name]
+    if not Info then return end
+    if typeof(Info.TextureID) == "Instance" then
+        local Clone = Info.TextureID:Clone(); Clone.Parent = Tool; Clone.CFrame = Orig.CFrame; Clone.Name = "CurrentSkin"
+        local W = Instance.new("Weld"); W.Part0 = Clone; W.Part1 = Orig; W.C0 = Info.CFrame:Inverse(); W.Parent = Clone
+        Orig.Transparency = 1
+    else
+        Orig.TextureID = Info.TextureID; Orig.Transparency = 0
+    end
+end
+function SkinChanger:SetupTool(Tool)
+    if not self.Enabled then return end
+    Tool.Equipped:Connect(function()
+        local Char = Tool.Parent
+        if Char ~= LocalPlayer.Character then return end
+        local Skin = shared.phase['Skin Modifications'].Weapons[Tool.Name]
+        if not Skin or Skin == "" then return end
+        if Tool.Name == "[Knife]" then self:ApplyKnife(Char, Tool, Skin) else self:ApplyGun(Tool, Skin) end
+    end)
+    Tool.Unequipped:Connect(function() if Tool.Name == "[Knife]" then self:CleanKnife(Tool) end end)
+    if Tool.Parent == LocalPlayer.Character then
+        local Skin = shared.phase['Skin Modifications'].Weapons[Tool.Name]
+        if Skin and Skin ~= "" then
+            if Tool.Name == "[Knife]" then task.spawn(function() self:ApplyKnife(LocalPlayer.Character, Tool, Skin) end)
+            else task.spawn(function() self:ApplyGun(Tool, Skin) end) end
+        end
+    end
+end
+function SkinChanger:WatchChar(Char)
+    for _, T in ipairs(Char:GetChildren()) do if T:IsA("Tool") then self:SetupTool(T) end end
+    Char.ChildAdded:Connect(function(T) if T:IsA("Tool") then self:SetupTool(T) end end)
+end
+function SkinChanger:Start()
+    if not self.Enabled then return end
+    if LocalPlayer.Character then self:WatchChar(LocalPlayer.Character) end
+    LocalPlayer.CharacterAdded:Connect(function(C) self:WatchChar(C) end)
+    local Bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+    if Bp then
+        for _, T in ipairs(Bp:GetChildren()) do if T:IsA("Tool") then self:SetupTool(T) end end
+        Bp.ChildAdded:Connect(function(T) if T:IsA("Tool") then self:SetupTool(T) end end)
+    end
+    MasterUnload:RegisterModule(self)
+end
+function SkinChanger:Unload()
+    self.Enabled = false
+    if LocalPlayer.Character then
+        for _, T in ipairs(LocalPlayer.Character:GetChildren()) do if T:IsA("Tool") and T.Name == "[Knife]" then self:CleanKnife(T) end end
+    end
+end
+
 HUD:Start()
 ESP:Start()
 SilentAim:Start()
@@ -539,11 +706,15 @@ HitboxExpander:Start()
 InstantFire:Start()
 ForceHit:Start()
 InfRange:Start()
+MuteGun:Start()
+SkinChanger:Start()
 
 MasterUnload:RegisterModule(Speed)
 MasterUnload:RegisterModule(Jump)
 MasterUnload:RegisterModule(HitboxExpander)
 MasterUnload:RegisterModule(InstantFire)
+MasterUnload:RegisterModule(MuteGun)
+MasterUnload:RegisterModule(SkinChanger)
 
 local Keybinds = shared.phase.Miscelaneous.Keybinds
 
@@ -623,3 +794,5 @@ end)
 UserInputService.InputEnded:Connect(function(Input)
     if Input.UserInputType == Enum.UserInputType.MouseButton1 then InstantFire.IsHolding = false end
 end)
+
+HUD:UpdateFeatures()
