@@ -1,3 +1,12 @@
+-- Load configuration from file
+local config_code = game:HttpGet("https://raw.githubusercontent.com/yourusername/config/main/config.lua") -- Replace with your actual URL
+loadstring(config_code)()
+
+-- Wait for config to load
+repeat task.wait() until shared.faze
+local Config = shared.faze
+
+-- Main script
 local players = game:GetService("Players")
 local uis = game:GetService("UserInputService")
 local run = game:GetService("RunService")
@@ -6,8 +15,6 @@ local localplayer = players.LocalPlayer
 local mouse = localplayer:GetMouse()
 local workspace = game:GetService("Workspace")
 local replicatedstorage = game:GetService("ReplicatedStorage")
-
-local Config = shared.faze
 
 local targeted_player = nil
 local esp_cache = {}
@@ -39,8 +46,8 @@ text_label.Size = UDim2.new(1, 0, 0, 24)
 text_label.Position = UDim2.new(0.5, 0, 0.5, 366)
 text_label.AnchorPoint = Vector2.new(0.5, 0.5)
 text_label.BackgroundTransparency = 1
-text_label.Text = Config.Miscelaneous.KeyDisplay.Title
-text_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Faze Title']
+text_label.Text = Config.Miscelaneous['Key Display'].Title
+text_label.TextColor3 = Config.Miscelaneous['Key Display']['Faze Title']
 text_label.TextSize = 18.2
 text_label.Font = Enum.Font.GothamBold
 text_label.ZIndex = 10
@@ -56,7 +63,7 @@ text_shadow.Size = UDim2.new(1, 0, 0, 24)
 text_shadow.Position = UDim2.new(0.5, 2, 0.5, 368)
 text_shadow.AnchorPoint = Vector2.new(0.5, 0.5)
 text_shadow.BackgroundTransparency = 1
-text_shadow.Text = Config.Miscelaneous.KeyDisplay.Title
+text_shadow.Text = Config.Miscelaneous['Key Display'].Title
 text_shadow.TextColor3 = Color3.fromRGB(0, 0, 0)
 text_shadow.TextTransparency = 0.5
 text_shadow.TextSize = 18.2
@@ -100,7 +107,7 @@ target_label.Position = UDim2.new(0.5, 0, 0.5, 394.2)
 target_label.AnchorPoint = Vector2.new(0.5, 0.5)
 target_label.BackgroundTransparency = 1
 target_label.Text = ""
-target_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
+target_label.TextColor3 = Config.Miscelaneous['Key Display']['Target Color']
 target_label.TextSize = 13.5
 target_label.Font = Enum.Font.GothamBold
 target_label.ZIndex = 10
@@ -117,7 +124,7 @@ target_shadow.Position = UDim2.new(0.5, 2, 0.5, 396.2)
 target_shadow.AnchorPoint = Vector2.new(0.5, 0.5)
 target_shadow.BackgroundTransparency = 1
 target_shadow.Text = ""
-target_shadow.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
+target_shadow.TextColor3 = Config.Miscelaneous['Key Display']['Target Color']
 target_shadow.TextTransparency = 0.5
 target_shadow.TextSize = 13.5
 target_shadow.Font = Enum.Font.GothamBold
@@ -126,8 +133,8 @@ target_shadow.Parent = key_display
 
 local function update_features_display(active)
     if active then
-        features_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
-        features_shadow.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
+        features_label.TextColor3 = Config.Miscelaneous['Key Display']['Target Color']
+        features_shadow.TextColor3 = Config.Miscelaneous['Key Display']['Target Color']
     else
         features_label.TextColor3 = Color3.fromRGB(255, 255, 255)
         features_shadow.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -462,10 +469,10 @@ run.RenderStepped:Connect(function()
         end
     end
     
-    if Config['Local Player'].SuperJump.Enabled and superjump_enabled then
+    if Config['Local Player']['Super Jump'].Enabled and superjump_enabled then
         local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
         if hum then
-            hum.JumpPower = Config['Local Player'].SuperJump['Jump Power']
+            hum.JumpPower = Config['Local Player']['Super Jump']['Jump Power']
         end
     end
     
