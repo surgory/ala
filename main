@@ -70,7 +70,7 @@ function HUD:Create()
     ScreenGui.Name = "phase_hud"
     ScreenGui.Parent = CoreGui
     MasterUnload:RegisterInstance(ScreenGui)
-    
+
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Size = UDim2.new(1, 0, 0, 24)
     TitleLabel.Position = UDim2.new(0.5, 0, 0.5, 366)
@@ -83,7 +83,7 @@ function HUD:Create()
     TitleLabel.ZIndex = 10
     TitleLabel.Parent = ScreenGui
     Instance.new("UIStroke", TitleLabel).Thickness = 0.8
-    
+
     local FeaturesLabel = Instance.new("TextLabel")
     FeaturesLabel.Size = UDim2.new(1, 0, 0, 24)
     FeaturesLabel.Position = UDim2.new(0.5, 0, 0.5, 385)
@@ -96,7 +96,7 @@ function HUD:Create()
     FeaturesLabel.ZIndex = 10
     FeaturesLabel.Parent = ScreenGui
     Instance.new("UIStroke", FeaturesLabel).Thickness = 0.8
-    
+
     local TargetLabel = Instance.new("TextLabel")
     TargetLabel.Size = UDim2.new(1, 0, 0, 20)
     TargetLabel.Position = UDim2.new(0.5, 0, 0.5, 400)
@@ -109,7 +109,7 @@ function HUD:Create()
     TargetLabel.ZIndex = 10
     TargetLabel.Parent = ScreenGui
     Instance.new("UIStroke", TargetLabel).Thickness = 0.8
-    
+
     self.UIObjects = {FeaturesLabel = FeaturesLabel, TargetLabel = TargetLabel}
 end
 
@@ -154,7 +154,7 @@ function ESP:CreateESP(Player)
     local HRP = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
     if not HRP then return end
     if self.ESPCache[Player] then pcall(function() self.ESPCache[Player]:Destroy() end) end
-    
+
     local Billboard = Instance.new("BillboardGui")
     Billboard.Size = UDim2.new(0, 100, 0, 30)
     Billboard.StudsOffset = Vector3.new(0, -3, 0)
@@ -162,7 +162,7 @@ function ESP:CreateESP(Player)
     Billboard.MaxDistance = 500
     Billboard.Parent = HRP
     MasterUnload:RegisterInstance(Billboard)
-    
+
     local Display = Instance.new("TextLabel")
     Display.Size = UDim2.new(1, 0, 0.5, 0)
     Display.BackgroundTransparency = 1
@@ -173,7 +173,7 @@ function ESP:CreateESP(Player)
     Display.TextStrokeTransparency = 0.5
     Display.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     Display.Parent = Billboard
-    
+
     local Username = Instance.new("TextLabel")
     Username.Size = UDim2.new(1, 0, 0.5, 0)
     Username.Position = UDim2.new(0, 0, 0.5, -2)
@@ -186,7 +186,7 @@ function ESP:CreateESP(Player)
     Username.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     Username.TextTransparency = 0.3
     Username.Parent = Billboard
-    
+
     self.ESPCache[Player] = Billboard
 end
 
@@ -531,66 +531,66 @@ local Keybinds = shared.phase.Miscelaneous.Keybinds
 
 UserInputService.InputBegan:Connect(function(Input, GameProcessed)
     if GameProcessed then return end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds.Target] then
         Target = GetClosestPlayer()
         if Target then HUD:SetTarget(Target.Name, true) end
         ESP:Refresh()
     end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds['Clear Target']] then
         Target = nil; HUD:SetTarget(nil, false); ESP:Refresh()
     end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds['Trigger Bot']] then
         shared.phase['Trigger Bot'].Enabled = not shared.phase['Trigger Bot'].Enabled
         HUD:UpdateFeatures()
     end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds.Speed] then
         shared.phase['Local Player'].Speed.Enabled = not shared.phase['Local Player'].Speed.Enabled
         HUD:UpdateFeatures()
         if not shared.phase['Local Player'].Speed.Enabled then Speed:Unload() end
     end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds['Cam Lock']] then
         shared.phase['Camera Lock'].Enabled = not shared.phase['Camera Lock'].Enabled
         HUD:UpdateFeatures()
     end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds.Jump] then
         shared.phase['Local Player'].Jump.Enabled = not shared.phase['Local Player'].Jump.Enabled
         if not shared.phase['Local Player'].Jump.Enabled then Jump:Unload() end
     end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds['Wall Jump']] then
         shared.phase['Local Player'].WallJump.Enabled = not shared.phase['Local Player'].WallJump.Enabled
     end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds['Force Hit']] then
         shared.phase['Gun Modifications']['Force Hit'].Enabled = not shared.phase['Gun Modifications']['Force Hit'].Enabled
     end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds['Hitbox Expander']] then
         shared.phase['Hitbox Expander'].Enabled = not shared.phase['Hitbox Expander'].Enabled
         HUD:UpdateFeatures()
         if not shared.phase['Hitbox Expander'].Enabled then HitboxExpander:Unload() end
     end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds['Panic Ground']] then PanicGround:Activate() end
-    
+
     if Input.KeyCode == Enum.KeyCode[Keybinds['Instant Fire']] then
         shared.phase['Gun Modifications']['Instant Fire'].Enabled = not shared.phase['Gun Modifications']['Instant Fire'].Enabled
         HUD:UpdateFeatures()
         if not shared.phase['Gun Modifications']['Instant Fire'].Enabled then InstantFire:Unload() end
     end
-    
+
     if Input.KeyCode == Enum.KeyCode.Space then WallJump:Perform() end
-    
+
     if Input.UserInputType == Enum.UserInputType.MouseButton1 then
         InstantFire.IsHolding = true; InstantFire.HasFired = false
     end
-    
+
     if Input.KeyCode == Enum.KeyCode.End then MasterUnload:UnloadAll() end
 end)
 
