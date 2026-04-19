@@ -1,12 +1,4 @@
--- Load configuration from file
-local config_code = game:HttpGet("https://raw.githubusercontent.com/surgory/ala/refs/heads/main/main") -- Replace with your actual URL
-loadstring(config_code)()
-
--- Wait for config to load
-repeat task.wait() until shared.faze
-local Config = shared.faze
-
--- Main script
+-- faze.cc | Complete Fixed SRC
 local players = game:GetService("Players")
 local uis = game:GetService("UserInputService")
 local run = game:GetService("RunService")
@@ -15,6 +7,8 @@ local localplayer = players.LocalPlayer
 local mouse = localplayer:GetMouse()
 local workspace = game:GetService("Workspace")
 local replicatedstorage = game:GetService("ReplicatedStorage")
+
+local Config = shared.faze
 
 local targeted_player = nil
 local esp_cache = {}
@@ -46,8 +40,8 @@ text_label.Size = UDim2.new(1, 0, 0, 24)
 text_label.Position = UDim2.new(0.5, 0, 0.5, 366)
 text_label.AnchorPoint = Vector2.new(0.5, 0.5)
 text_label.BackgroundTransparency = 1
-text_label.Text = Config.Miscelaneous['Key Display'].Title
-text_label.TextColor3 = Config.Miscelaneous['Key Display']['Faze Title']
+text_label.Text = Config.Miscelaneous.KeyDisplay.Title
+text_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Faze Title']
 text_label.TextSize = 18.2
 text_label.Font = Enum.Font.GothamBold
 text_label.ZIndex = 10
@@ -63,7 +57,7 @@ text_shadow.Size = UDim2.new(1, 0, 0, 24)
 text_shadow.Position = UDim2.new(0.5, 2, 0.5, 368)
 text_shadow.AnchorPoint = Vector2.new(0.5, 0.5)
 text_shadow.BackgroundTransparency = 1
-text_shadow.Text = Config.Miscelaneous['Key Display'].Title
+text_shadow.Text = Config.Miscelaneous.KeyDisplay.Title
 text_shadow.TextColor3 = Color3.fromRGB(0, 0, 0)
 text_shadow.TextTransparency = 0.5
 text_shadow.TextSize = 18.2
@@ -107,7 +101,7 @@ target_label.Position = UDim2.new(0.5, 0, 0.5, 394.2)
 target_label.AnchorPoint = Vector2.new(0.5, 0.5)
 target_label.BackgroundTransparency = 1
 target_label.Text = ""
-target_label.TextColor3 = Config.Miscelaneous['Key Display']['Target Color']
+target_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
 target_label.TextSize = 13.5
 target_label.Font = Enum.Font.GothamBold
 target_label.ZIndex = 10
@@ -124,7 +118,7 @@ target_shadow.Position = UDim2.new(0.5, 2, 0.5, 396.2)
 target_shadow.AnchorPoint = Vector2.new(0.5, 0.5)
 target_shadow.BackgroundTransparency = 1
 target_shadow.Text = ""
-target_shadow.TextColor3 = Config.Miscelaneous['Key Display']['Target Color']
+target_shadow.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
 target_shadow.TextTransparency = 0.5
 target_shadow.TextSize = 13.5
 target_shadow.Font = Enum.Font.GothamBold
@@ -133,8 +127,8 @@ target_shadow.Parent = key_display
 
 local function update_features_display(active)
     if active then
-        features_label.TextColor3 = Config.Miscelaneous['Key Display']['Target Color']
-        features_shadow.TextColor3 = Config.Miscelaneous['Key Display']['Target Color']
+        features_label.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
+        features_shadow.TextColor3 = Config.Miscelaneous.KeyDisplay['Target Color']
     else
         features_label.TextColor3 = Color3.fromRGB(255, 255, 255)
         features_shadow.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -149,6 +143,20 @@ local function update_target_display(name)
         target_label.Text = ""
         target_shadow.Text = ""
     end
+end
+
+local function update_features_text()
+    local text_parts = {}
+    if Config['Silent Aim'].Enabled then table.insert(text_parts, "Silent") end
+    if Config['Trigger Bot'].Enabled then table.insert(text_parts, "Trigger") end
+    if Config['Aim Assist'].Enabled then table.insert(text_parts, "Aim") end
+    if Config.ESP.Enabled then table.insert(text_parts, "ESP") end
+    if speed_enabled then table.insert(text_parts, "Speed") end
+    if superjump_enabled then table.insert(text_parts, "Jump") end
+    
+    local display_text = #text_parts > 0 and table.concat(text_parts, " | ") or "faze.cc"
+    features_label.Text = display_text
+    features_shadow.Text = display_text
 end
 
 local esp_gui = Instance.new("ScreenGui")
@@ -469,10 +477,10 @@ run.RenderStepped:Connect(function()
         end
     end
     
-    if Config['Local Player']['Super Jump'].Enabled and superjump_enabled then
+    if Config['Local Player'].SuperJump.Enabled and superjump_enabled then
         local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
         if hum then
-            hum.JumpPower = Config['Local Player']['Super Jump']['Jump Power']
+            hum.JumpPower = Config['Local Player'].SuperJump['Jump Power']
         end
     end
     
@@ -501,10 +509,12 @@ uis.InputBegan:Connect(function(input, gp)
     if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Trigger Bot']] then
         trigger_enabled = not trigger_enabled
         fov_circle.Visible = trigger_enabled and Config['Trigger Bot'].Settings.FOV.Visible
+        update_features_text()
     end
     
     if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Aim Assist']] then
         aim_assist_active = not aim_assist_active
+        update_features_text()
     end
     
     if key == Enum.KeyCode[Config.Miscelaneous.Keybinds.Speed] then
@@ -513,6 +523,7 @@ uis.InputBegan:Connect(function(input, gp)
             local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
             if hum then hum.WalkSpeed = 16 end
         end
+        update_features_text()
     end
     
     if key == Enum.KeyCode[Config.Miscelaneous.Keybinds['Super Jump']] then
@@ -521,6 +532,7 @@ uis.InputBegan:Connect(function(input, gp)
             local hum = localplayer.Character and localplayer.Character:FindFirstChild("Humanoid")
             if hum then hum.JumpPower = 50 end
         end
+        update_features_text()
     end
     
     if key == Enum.KeyCode.Space and Config['Local Player'].Spiderman.Enabled then
@@ -560,19 +572,30 @@ uis.InputEnded:Connect(function(input, gp)
     end
 end)
 
-players.PlayerAdded:Connect(function(plr)
+local function on_player_added(plr)
+    if plr == localplayer then return end
     plr.CharacterAdded:Connect(function(char)
         char:WaitForChild("HumanoidRootPart", 10)
         repeat task.wait(0.1) until is_alive(plr)
         refresh_esp()
     end)
-end)
+    if plr.Character and is_alive(plr) then
+        refresh_esp()
+    end
+end
+
+for _, plr in ipairs(players:GetPlayers()) do
+    on_player_added(plr)
+end
+
+players.PlayerAdded:Connect(on_player_added)
 
 localplayer.CharacterAdded:Connect(function(char)
     repeat task.wait(0.1) until is_alive(localplayer)
     refresh_esp()
     setupwalljumpreset()
     applyheadless(char)
+    update_features_text()
 end)
 
 if localplayer.Character then
@@ -581,3 +604,4 @@ if localplayer.Character then
 end
 
 refresh_esp()
+update_features_text()
